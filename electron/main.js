@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog, Notification } = require("electron");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -37,9 +37,11 @@ let updateState={
   supported:false,
   configured:false,
   autoDownload:false,
+  channel:"stable",
   reason:""
 };
 let updaterInitialized=false;
+let notifiedUpdateVersion="";
 
 function updateLog(message){
   writeStartupLog("UPDATE: "+message);
@@ -48,23 +50,84 @@ function isPortableBuild(){
   return !!process.env.PORTABLE_EXECUTABLE_FILE;
 }
 function updaterConfigExists(){
-  try{
-    return fs.existsSync(path.join(process.resourcesPath,"app-update.yml"));
-  }catch{return false}
+  try{return fs.existsSync(path.join(process.resourcesPath,"app-update.yml"))}
+  catch{return false}
 }
 function normalizeReleaseNotes(notes){
   if(!notes)return"";
-  if(typeof notes==="string")return notes.slice(0,4000);
-  if(Array.isArray(notes)){
-    return notes.map(x=>typeof x==="string"?x:(x?.note||"")).filter(Boolean).join("\n").slice(0,4000);
-  }
-  return String(notes).slice(0,4000);
+  if(typeof notes==="string")return notes.slice(0,6000);
+  if(Array.isArray(notes))return notes.map(x=>typeof x==="string"?x:(x?.note||"")).filter(Boolean).join("\n").slice(0,6000);
+  return String(notes).slice(0,6000);
 }
 function sendUpdateState(patch={}){
   updateState={...updateState,...patch,currentVersion:app.getVersion()};
   try{
     if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send("update-status",updateState);
   }catch{}
+}
+function applyUpdatePreferences(preferences={}){
+  if(!autoUpdater)return;
+  const channel=preferences.channel==="beta"?"beta":"stable";
+  autoUpdater.autoDownload=!!preferences.autoDownload;
+  autoUpdater.allowPrerelease=channel==="beta";
+  updateState.autoDownload=!!preferences.autoDownload;
+  updateState.channel=channel;
+}
+function notifyUpdateAvailable(info){
+  const version=info?.version||"";
+  if(!version||version===notifiedUpdateVersion)return;
+  notifiedUpdateVersion=version;
+  try{
+    if(Notification.isSupported()){
+      const notes=normalizeReleaseNotes(info.releaseNotes).split("\n").find(Boolean)||"Klikni pro podrobnosti.";
+      const notification=new Notification({
+        title:`Kvaltík Hub ${version}`,
+        body:`Je dostupná nová verze. ${notes}`.slice(0,220)
+      });
+      notification.on("click",()=>{
+        if(mainWindow){
+          if(mainWindow.isMinimized())mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send("update-open-settings");
+        }
+      });
+      notification.show();
+    }
+  }catch(e){
+    updateLog(`Windows notifikace selhala: ${e.message}`);
+  }
+}
+function createPreUpdateBackup(){
+  try{
+    const userData=app.getPath("userData");
+    const backupsRoot=path.join(userData,"update-backups");
+    const stamp=new Date().toISOString().replace(/[:.]/g,"-");
+    const backupDir=path.join(backupsRoot,`before-${app.getVersion()}-${stamp}`);
+    fs.mkdirSync(backupDir,{recursive:true});
+
+    const importantFiles=[
+      "hub-storage.json",
+      "discord-config.json",
+      "music-library.json"
+    ];
+    for(const name of importantFiles){
+      const source=path.join(userData,name);
+      if(fs.existsSync(source))fs.copyFileSync(source,path.join(backupDir,name));
+    }
+
+    fs.writeFileSync(path.join(backupDir,"backup-info.json"),JSON.stringify({
+      createdAt:new Date().toISOString(),
+      version:app.getVersion(),
+      purpose:"before-update"
+    },null,2),"utf8");
+
+    updateLog(`Záloha vytvořena: ${backupDir}`);
+    return {ok:true,path:backupDir};
+  }catch(e){
+    updateLog(`Záloha selhala: ${e.stack||e.message}`);
+    return {ok:false,error:e.message};
+  }
 }
 function initializeUpdater(){
   if(updaterInitialized)return;
@@ -81,17 +144,14 @@ function initializeUpdater(){
     configured,
     state:supported?"idle":"unsupported",
     message:supported
-      ?(configured?"Připraveno ke kontrole aktualizací.":"GitHub aktualizace zatím nejsou nakonfigurované.")
+      ?(configured?"Připraveno ke kontrole aktualizací.":"GitHub aktualizace nejsou nakonfigurované.")
       :(portable?"Portable verze nepoužívá automatické aktualizace.":(!app.isPackaged?"Aktualizace fungují až v nainstalované aplikaci.":"Modul aktualizací není dostupný.")),
-    reason:portable
-      ?"Portable verze se neaktualizuje automaticky."
-      :(!app.isPackaged?"Spusť nainstalovaný Kvaltík Hub.":"")
+    reason:portable?"Portable verze se neaktualizuje automaticky.":(!app.isPackaged?"Spusť nainstalovaný Kvaltík Hub.":"")
   };
 
   if(!supported)return;
 
   autoUpdater.autoDownload=false;
-  // electron-updater 6.x / electron-builder 26.x:
   autoUpdater.autoInstallOnAppQuit=false;
   autoUpdater.allowPrerelease=false;
 
@@ -107,6 +167,7 @@ function initializeUpdater(){
       availableVersion:info.version||"",
       releaseNotes:normalizeReleaseNotes(info.releaseNotes)
     });
+    notifyUpdateAvailable(info);
   });
   autoUpdater.on("update-not-available",info=>{
     updateLog("Aplikace je aktuální.");
@@ -146,8 +207,6 @@ function initializeUpdater(){
     });
   });
 }
-
-
 
 
 function hubStoragePath(){
@@ -486,8 +545,11 @@ ipcMain.handle("update-check",async(_event,preferences={})=>{
   if(!updateState.configured)return {ok:false,error:"Aktualizace nejsou nakonfigurované pro GitHub Releases."};
 
   try{
-    autoUpdater.autoDownload=!!preferences.autoDownload;
-    sendUpdateState({autoDownload:!!preferences.autoDownload});
+    applyUpdatePreferences(preferences);
+    sendUpdateState({
+      autoDownload:!!preferences.autoDownload,
+      channel:preferences.channel==="beta"?"beta":"stable"
+    });
     await autoUpdater.checkForUpdates();
     return {ok:true};
   }catch(e){
@@ -509,13 +571,17 @@ ipcMain.handle("update-download",async()=>{
   }
 });
 
-ipcMain.handle("update-install",()=>{
+ipcMain.handle("update-install",(_event,preferences={})=>{
   initializeUpdater();
   if(updateState.state!=="downloaded")return {ok:false,error:"Aktualizace ještě není stažená."};
+
+  if(preferences.backupBeforeUpdate!==false){
+    const backup=createPreUpdateBackup();
+    if(!backup.ok)return {ok:false,backupFailed:true,error:backup.error};
+  }
+
   updateLog("Spouštím instalaci stažené aktualizace.");
-  setImmediate(()=>{
-    autoUpdater.quitAndInstall(false,true);
-  });
+  setImmediate(()=>autoUpdater.quitAndInstall(false,true));
   return {ok:true};
 });
 

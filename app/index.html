@@ -656,6 +656,16 @@
         </div>
 
         <div class="settings-panel" id="settings-tab-updates">
+          <div class="update-notice-banner" id="updateNoticeBanner" style="display:none">
+            <div class="update-notice-icon">🔔</div>
+            <div class="update-notice-copy">
+              <strong id="updateNoticeTitle">Je dostupná nová verze</strong>
+              <span id="updateNoticeText">Nová verze Kvaltík Hubu je připravená.</span>
+            </div>
+            <button class="primary-btn" id="updateNoticeActionBtn" type="button">Zobrazit</button>
+            <button class="icon-btn" id="updateNoticeCloseBtn" type="button" title="Skrýt">✕</button>
+          </div>
+
           <div class="update-layout">
             <div class="panel update-main-card">
               <div class="update-header">
@@ -697,6 +707,14 @@
                 <button class="primary-btn update-install-btn" id="installUpdateBtn" type="button" style="display:none">🚀 Restartovat a nainstalovat</button>
               </div>
 
+              <div class="update-backup-status">
+                <span>🛡️</span>
+                <div>
+                  <strong>Bezpečnostní záloha</strong>
+                  <small id="updateBackupStatusText">Před instalací se automaticky vytvoří záloha.</small>
+                </div>
+              </div>
+
               <div class="update-release-notes" id="updateReleaseNotes" style="display:none">
                 <h4>📝 Co je nového</h4>
                 <p id="updateReleaseNotesText">—</p>
@@ -705,6 +723,7 @@
 
             <div class="panel">
               <h3>⚙️ Automatické aktualizace</h3>
+
               <label class="setting-toggle">
                 <div>
                   <strong>Automaticky kontrolovat</strong>
@@ -715,22 +734,42 @@
 
               <label class="setting-toggle">
                 <div>
-                  <strong>Automaticky stahovat</strong>
-                  <small>Nová verze se stáhne na pozadí. Instalaci stále potvrdíš.</small>
+                  <strong>Automaticky stahovat na pozadí</strong>
+                  <small>Po nalezení nové verze se aktualizace sama stáhne.</small>
                 </div>
                 <input type="checkbox" id="autoDownloadUpdatesToggle" />
               </label>
 
+              <label class="setting-toggle">
+                <div>
+                  <strong>Záloha před instalací</strong>
+                  <small>Před aktualizací uloží kopii dat aplikace.</small>
+                </div>
+                <input type="checkbox" id="backupBeforeUpdateToggle" checked />
+              </label>
+
+              <div class="update-channel-box">
+                <div>
+                  <strong>🧪 Kanál aktualizací</strong>
+                  <small>Stable = běžné verze, Beta = testovací verze.</small>
+                </div>
+                <select id="updateChannelSelect">
+                  <option value="stable">Stable</option>
+                  <option value="beta">Beta</option>
+                </select>
+              </div>
+
               <div class="update-config-info">
-                <strong id="updateConfigTitle">GitHub Releases</strong>
-                <p id="updateConfigText">Konfigurace se načte z instalátoru aplikace.</p>
+                <strong>GitHub Releases</strong>
+                <p id="updateConfigText">Kontroluji konfiguraci…</p>
               </div>
             </div>
 
             <div class="panel">
-              <h3>🛡️ Tvoje data zůstanou zachovaná</h3>
-              <p>Aktualizace nahrazuje soubory programu, ale nesmaže tvůj profil, ETS 2 jízdy, Farming data, přátele, nastavení ani playlist.</p>
-              <p class="update-small-note">Automatické aktualizace fungují v nainstalované NSIS verzi Kvaltík Hubu. Portable a vývojová verze aktualizace pouze kontrolují omezeně nebo je mají vypnuté.</p>
+              <h3>🔄 Jak aktualizace proběhne</h3>
+              <p>Nová verze se najde přes GitHub Releases. Pokud máš zapnuté automatické stahování, stáhne se na pozadí.</p>
+              <p>Před instalací se může vytvořit záloha. Potom klikneš na <strong>Restartovat a nainstalovat</strong>.</p>
+              <p class="update-small-note">Stable ignoruje GitHub Pre-release. Beta dovolí i testovací Pre-release verze.</p>
             </div>
           </div>
         </div>

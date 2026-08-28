@@ -10,13 +10,16 @@ contextBridge.exposeInMainWorld("kvaltikDesktop", {
   getUpdateInfo: () => ipcRenderer.invoke("update-get-info"),
   checkForUpdates: (preferences) => ipcRenderer.invoke("update-check", preferences),
   downloadUpdate: () => ipcRenderer.invoke("update-download"),
-  installUpdate: () => ipcRenderer.invoke("update-install"),
+  installUpdate: (preferences) => ipcRenderer.invoke("update-install", preferences),
   onUpdateStatus: (callback) => {
     ipcRenderer.removeAllListeners("update-status");
     ipcRenderer.on("update-status", (_event, state) => callback(state));
   },
+  onOpenUpdateSettings: (callback) => {
+    ipcRenderer.removeAllListeners("update-open-settings");
+    ipcRenderer.on("update-open-settings", () => callback());
+  },
 
-  // Persistent synchronous key/value storage for local app data.
   storageGet: (key) => ipcRenderer.sendSync("storage-get", key),
   storageSet: (key, value) => ipcRenderer.sendSync("storage-set", {key, value}),
   storageRemove: (key) => ipcRenderer.sendSync("storage-remove", key)

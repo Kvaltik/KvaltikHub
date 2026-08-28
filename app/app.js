@@ -24,7 +24,7 @@ const defaultUserData={
   company:null,drivers:[],fleet:[],finance:[],
   etsFinance:[],farmMachines:[],farmFields:[],farmStorage:[],farmFinance:[],
   friends:[],weatherCity:"Praha",
-  updateSettings:{autoCheck:true,autoDownload:false},
+  updateSettings:{autoCheck:true,autoDownload:false,backupBeforeUpdate:true,channel:"stable"},
   projects:[],notes:[],theme:"dark"
 };
 
@@ -876,13 +876,44 @@ document.getElementById("downloadUpdateBtn").onclick=async()=>{
 };
 document.getElementById("installUpdateBtn").onclick=async()=>{
   if(!confirm("Kvaltík Hub se zavře, nainstaluje novou verzi a znovu spustí. Pokračovat?"))return;
-  await window.kvaltikDesktop?.installUpdate?.();
+
+  const prefs=getUpdatePrefs();
+  const result=await window.kvaltikDesktop?.installUpdate?.({
+    backupBeforeUpdate:prefs.backupBeforeUpdate
+  });
+
+  if(result&&!result.ok){
+    if(result.backupFailed){
+      const withoutBackup=confirm("Bezpečnostní zálohu se nepodařilo vytvořit.\n\nChceš pokračovat bez zálohy?");
+      if(withoutBackup)await window.kvaltikDesktop?.installUpdate?.({backupBeforeUpdate:false});
+    }else toast(result.error||"Aktualizaci se nepodařilo nainstalovat.");
+  }
 };
 document.getElementById("autoCheckUpdatesToggle").onchange=saveUpdatePreferences;
 document.getElementById("autoDownloadUpdatesToggle").onchange=saveUpdatePreferences;
+document.getElementById("backupBeforeUpdateToggle").onchange=saveUpdatePreferences;
+document.getElementById("updateChannelSelect").onchange=()=>{
+  saveUpdatePreferences();
+  updateNoticeDismissedVersion="";
+  checkForUpdates(false);
+};
+document.getElementById("updateNoticeCloseBtn").onclick=()=>{
+  updateNoticeDismissedVersion=updateLastState?.availableVersion||"";
+  document.getElementById("updateNoticeBanner").style.display="none";
+};
+document.getElementById("updateNoticeActionBtn").onclick=()=>{
+  if(updateLastState?.state==="downloaded")document.getElementById("installUpdateBtn").click();
+  else document.querySelector('[data-settings-tab="updates"]')?.click();
+};
 
 if(window.kvaltikDesktop?.onUpdateStatus){
   window.kvaltikDesktop.onUpdateStatus(state=>renderUpdateState(state));
+}
+if(window.kvaltikDesktop?.onOpenUpdateSettings){
+  window.kvaltikDesktop.onOpenUpdateSettings(()=>{
+    document.querySelector('[data-page="settings"]')?.click();
+    setTimeout(()=>document.querySelector('[data-settings-tab="updates"]')?.click(),100);
+  });
 }
 
 document.getElementById("themeBtn").onclick=()=>{data.theme=data.theme==="dark"?"light":"dark";saveData()};
@@ -930,6 +961,7 @@ initClockAndMusic();
 
 let updateUiInitialized=false;
 let updateLastState=null;
+let updateNoticeDismissedVersion="";
 
 function humanBytes(bytes){
   const n=Number(bytes||0);
@@ -942,6 +974,51 @@ function setUpdatePill(text,type=""){
   if(!pill)return;
   pill.textContent=text;
   pill.className="update-status-pill"+(type?` ${type}`:"");
+}
+function getUpdatePrefs(){
+  const p=data.updateSettings||{};
+  return{
+    autoCheck:p.autoCheck!==false,
+    autoDownload:!!p.autoDownload,
+    backupBeforeUpdate:p.backupBeforeUpdate!==false,
+    channel:p.channel==="beta"?"beta":"stable"
+  };
+}
+function renderBackupPreference(){
+  const el=document.getElementById("updateBackupStatusText");
+  if(!el)return;
+  el.textContent=getUpdatePrefs().backupBeforeUpdate
+    ?"Před instalací se automaticky vytvoří záloha."
+    :"Automatická záloha je vypnutá.";
+}
+function showUpdateNotice(state){
+  const banner=document.getElementById("updateNoticeBanner");
+  if(!banner)return;
+  const version=state?.availableVersion||"";
+  const visible=["available","downloading","downloaded"].includes(state?.state)
+    &&version&&version!==updateNoticeDismissedVersion;
+  banner.style.display=visible?"grid":"none";
+  if(!visible)return;
+
+  const title=document.getElementById("updateNoticeTitle");
+  const text=document.getElementById("updateNoticeText");
+  const btn=document.getElementById("updateNoticeActionBtn");
+
+  if(state.state==="downloaded"){
+    title.textContent=`Aktualizace ${version} je připravená`;
+    text.textContent="Je stažená a čeká na instalaci.";
+    btn.textContent="Nainstalovat";
+  }else if(state.state==="downloading"){
+    title.textContent=`Stahuji Kvaltík Hub ${version}`;
+    text.textContent=`Staženo ${Math.round(Number(state.percent||0))} %.`;
+    btn.textContent="Zobrazit";
+  }else{
+    title.textContent=`Je dostupná nová verze ${version}`;
+    text.textContent=state.releaseNotes
+      ?"V aplikaci jsou dostupné poznámky k této verzi."
+      :"Nová verze Kvaltík Hubu je připravená.";
+    btn.textContent="Zobrazit";
+  }
 }
 function renderUpdateState(state){
   if(!state)return;
@@ -967,22 +1044,17 @@ function renderUpdateState(state){
 
   if(configText){
     if(!state.supported)configText.textContent=state.reason||"Automatické aktualizace nejsou v této verzi dostupné.";
-    else if(!state.configured)configText.textContent="Aktualizace zatím nejsou propojené s GitHub repozitářem. Nejdřív spusť NASTAVIT_AKTUALIZACE.cmd a vytvoř nový instalátor.";
-    else configText.textContent="GitHub Releases jsou nakonfigurované a připravené.";
+    else if(!state.configured)configText.textContent="GitHub aktualizace nejsou nakonfigurované.";
+    else configText.textContent=`GitHub Releases jsou připravené • kanál ${getUpdatePrefs().channel==="beta"?"Beta":"Stable"}.`;
   }
 
   if(checkBtn)checkBtn.disabled=state.state==="checking"||state.state==="downloading"||!state.supported;
   if(downloadBtn){
-    const show=state.state==="available" && !state.autoDownload;
-    downloadBtn.style.display=show?"inline-block":"none";
-    downloadBtn.disabled=!state.supported;
+    downloadBtn.style.display=(state.state==="available"&&!getUpdatePrefs().autoDownload)?"inline-block":"none";
   }
   if(installBtn)installBtn.style.display=state.state==="downloaded"?"inline-block":"none";
 
-  if(progressWrap){
-    const show=state.state==="downloading";
-    progressWrap.style.display=show?"block":"none";
-  }
+  if(progressWrap)progressWrap.style.display=state.state==="downloading"?"block":"none";
   if(progressFill)progressFill.style.width=`${Math.max(0,Math.min(100,Number(state.percent||0)))}%`;
   if(progressPercent)progressPercent.textContent=`${Math.round(Number(state.percent||0))} %`;
   if(progressDetail)progressDetail.textContent=`${humanBytes(state.transferred)} / ${humanBytes(state.total)} • ${humanBytes(state.bytesPerSecond)}/s`;
@@ -991,37 +1063,30 @@ function renderUpdateState(state){
     if(state.releaseNotes){
       notesBox.style.display="block";
       notesText.textContent=state.releaseNotes;
-    }else{
-      notesBox.style.display="none";
-    }
+    }else notesBox.style.display="none";
   }
 
-  const typeMap={
-    idle:"",checking:"info",available:"warning",downloading:"info",
-    downloaded:"success",uptodate:"success",error:"error",unsupported:"warning"
-  };
-  const textMap={
-    idle:"Připraveno",checking:"Kontroluji",available:"Nová verze",
-    downloading:"Stahuji",downloaded:"Připraveno",uptodate:"Aktuální",
-    error:"Chyba",unsupported:"Nedostupné"
-  };
+  const typeMap={idle:"",checking:"info",available:"warning",downloading:"info",downloaded:"success",uptodate:"success",error:"error",unsupported:"warning"};
+  const textMap={idle:"Připraveno",checking:"Kontroluji",available:"Nová verze",downloading:"Stahuji",downloaded:"Připraveno",uptodate:"Aktuální",error:"Chyba",unsupported:"Nedostupné"};
   setUpdatePill(textMap[state.state]||"Čekám",typeMap[state.state]||"");
+  showUpdateNotice(state);
 }
-
 async function initUpdaterUi(force=false){
   if(updateUiInitialized&&!force)return;
   if(!window.kvaltikDesktop?.getUpdateInfo)return;
   updateUiInitialized=true;
 
-  const prefs=data.updateSettings||{autoCheck:true,autoDownload:false};
-  document.getElementById("autoCheckUpdatesToggle").checked=prefs.autoCheck!==false;
-  document.getElementById("autoDownloadUpdatesToggle").checked=!!prefs.autoDownload;
+  const prefs=getUpdatePrefs();
+  document.getElementById("autoCheckUpdatesToggle").checked=prefs.autoCheck;
+  document.getElementById("autoDownloadUpdatesToggle").checked=prefs.autoDownload;
+  document.getElementById("backupBeforeUpdateToggle").checked=prefs.backupBeforeUpdate;
+  document.getElementById("updateChannelSelect").value=prefs.channel;
+  renderBackupPreference();
 
   try{
     const info=await window.kvaltikDesktop.getUpdateInfo();
     renderUpdateState(info);
-
-    if(prefs.autoCheck!==false&&info?.supported&&info?.configured){
+    if(prefs.autoCheck&&info?.supported&&info?.configured){
       setTimeout(()=>checkForUpdates(false),2500);
     }
   }catch(e){
@@ -1030,18 +1095,23 @@ async function initUpdaterUi(force=false){
 }
 async function checkForUpdates(showToast=true){
   if(!window.kvaltikDesktop?.checkForUpdates)return;
-  const prefs=data.updateSettings||{};
-  const result=await window.kvaltikDesktop.checkForUpdates({autoDownload:!!prefs.autoDownload});
+  const prefs=getUpdatePrefs();
+  const result=await window.kvaltikDesktop.checkForUpdates({
+    autoDownload:prefs.autoDownload,
+    channel:prefs.channel
+  });
   if(result&&!result.ok&&showToast)toast(result.error||"Kontrola aktualizací se nepodařila.");
 }
 function saveUpdatePreferences(){
   data.updateSettings={
     autoCheck:document.getElementById("autoCheckUpdatesToggle").checked,
-    autoDownload:document.getElementById("autoDownloadUpdatesToggle").checked
+    autoDownload:document.getElementById("autoDownloadUpdatesToggle").checked,
+    backupBeforeUpdate:document.getElementById("backupBeforeUpdateToggle").checked,
+    channel:document.getElementById("updateChannelSelect").value==="beta"?"beta":"stable"
   };
   saveData("Nastavení aktualizací bylo uloženo.");
+  renderBackupPreference();
 }
-
 
 function migrateLegacyBrowserStorage(){
   if(!window.kvaltikDesktop?.storageGet)return;
