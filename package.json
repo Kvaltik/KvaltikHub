@@ -1,6 +1,6 @@
 {
   "name": "kvaltik-hub-desktop",
-  "version": "17.0.2",
+  "version": "18.0.0",
   "description": "Kvaltík Hub Desktop - ETS 2, Farming, Discord a další projekty",
   "main": "electron/main.js",
   "author": "Kvaltík",
