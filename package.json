@@ -1,0 +1,78 @@
+{
+  "name": "kvaltik-hub-desktop",
+  "version": "17.0.0",
+  "description": "Kvaltík Hub Desktop - ETS 2, Farming, Discord a další projekty",
+  "main": "electron/main.js",
+  "author": "Kvaltík",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable",
+    "dist:installer": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "release": "electron-builder --win nsis --publish always",
+    "release:build": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "cz.kvaltik.hub",
+    "productName": "Kvaltík Hub",
+    "asar": true,
+    "files": [
+      "app/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kvaltík Hub",
+      "uninstallDisplayName": "Kvaltík Hub",
+      "artifactName": "Kvaltik-Hub-Setup-${version}-${arch}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": false
+    },
+    "portable": {
+      "artifactName": "Kvaltik-Hub-Portable-${version}-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Kvaltik",
+        "repo": "KvaltikHub",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kvaltik/KvaltikHub.git"
+  }
+}

@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>Kvaltík Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo-wrap">
+        <div class="loading-logo">K</div>
+        <div class="loading-glow"></div>
+      </div>
+      <h1>Kvaltík Hub</h1>
+      <p id="loadingText">Spouštím aplikaci...</p>
+      <div class="loading-bar">
+        <div class="loading-progress" id="loadingProgress"></div>
+      </div>
+      <div class="loading-percent" id="loadingPercent">0 %</div>
+      <small>ETS 2 • Farming • Projekty • Discord</small>
+    </div>
+  </div>
+
+  
+  <script>
+    // Nouzová pojistka startu: funguje nezávisle na app.js.
+    window.__kvaltikStartupFailsafe = setTimeout(function () {
+      try {
+        var loading = document.getElementById("loadingScreen");
+        var auth = document.getElementById("authScreen");
+        var shell = document.getElementById("appShell");
+
+        if (auth) auth.classList.remove("hidden");
+        if (shell) shell.classList.add("locked");
+
+        if (loading) {
+          loading.classList.add("hide");
+          setTimeout(function () {
+            if (loading && loading.parentNode) loading.parentNode.removeChild(loading);
+          }, 500);
+        }
+
+        console.warn("Kvaltík Hub: aktivována nouzová pojistka načítání.");
+      } catch (e) {
+        console.error("Kvaltík Hub startup failsafe:", e);
+      }
+    }, 6000);
+
+    window.addEventListener("error", function (event) {
+      console.error("Kvaltík Hub renderer error:", event.error || event.message);
+    });
+
+    window.addEventListener("unhandledrejection", function (event) {
+      console.error("Kvaltík Hub unhandled promise rejection:", event.reason);
+    });
+  </script>
+
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">K</div>
+      <h1>Kvaltík Hub</h1>
+      <p id="authLead">Přihlas se do svého centra.</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-auth="login">Přihlášení</button>
+        <button class="auth-tab" data-auth="register">Registrace</button>
+      </div>
+
+      <form id="loginForm" class="auth-form active">
+        <label>Uživatelské jméno
+          <input id="loginUsername" autocomplete="username" required />
+        </label>
+        <label>Heslo
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </label>
+
+        <label class="remember-login-row">
+          <input id="rememberLogin" type="checkbox" checked />
+          <span>
+            <strong>Zapamatovat přihlášení</strong>
+            <small>Po příštím spuštění se Kvaltík Hub otevře automaticky.</small>
+          </span>
+        </label>
+
+        <button class="primary-btn" type="submit">Přihlásit se</button>
+      </form>
+
+      <form id="registerForm" class="auth-form">
+        <label>Uživatelské jméno
+          <input id="registerUsername" minlength="3" maxlength="30" required />
+        </label>
+        <label>E-mail
+          <input id="registerEmail" type="email" required />
+        </label>
+        <label>Heslo
+          <input id="registerPassword" type="password" minlength="4" required />
+        </label>
+        <label>Heslo znovu
+          <input id="registerPassword2" type="password" minlength="4" required />
+        </label>
+        <button class="primary-btn" type="submit">Vytvořit účet</button>
+      </form>
+
+      <p class="auth-note">🔐 Heslo se při zapamatování přihlášení neukládá. Ukládá se pouze relace tohoto zařízení.</p>
+    </div>
+  </div>
+
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo">K</div>
+        <div>
+          <h1>Kvaltík Hub</h1>
+          <span>Desktop • Moje centrum</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-page="dashboard">🏠 <span>Domů</span></button>
+
+        <div class="nav-folder">
+          <button class="nav-folder-toggle" data-folder="ets">
+            <span>🚛 ETS 2</span><span class="folder-arrow">▸</span>
+          </button>
+          <div class="nav-folder-items" id="folder-ets">
+            <button class="nav-subitem" data-page="ets2">📘 Kniha jízd</button>
+            <button class="nav-subitem" data-page="company">🏢 Virtuální firma</button>
+            <button class="nav-subitem" data-page="ets-fleet">🚛 Vozový park</button>
+            <button class="nav-subitem" data-page="ets-finance">💰 Finance</button>
+          </div>
+        </div>
+
+        <div class="nav-folder">
+          <button class="nav-folder-toggle" data-folder="farm">
+            <span>🚜 Farming</span><span class="folder-arrow">▸</span>
+          </button>
+          <div class="nav-folder-items" id="folder-farm">
+            <button class="nav-subitem" data-page="farming">📘 Kniha prací</button>
+            <button class="nav-subitem" data-page="farm-machines">🚜 Stroje</button>
+            <button class="nav-subitem" data-page="farm-fields">🌾 Pole</button>
+            <button class="nav-subitem" data-page="farm-storage">🏚️ Sklady</button>
+            <button class="nav-subitem" data-page="farm-finance">💰 Finance</button>
+          </div>
+        </div>
+
+        <button class="nav-item" data-page="friends">👥 <span>Přátelé</span></button>
+        <button class="nav-item" data-page="gallery">🖼️ <span>Obrázky</span></button>
+        <button class="nav-item" data-page="socials">🌐 <span>Sociální sítě</span></button>
+        <button class="nav-item" data-page="discord">💬 <span>Discord</span></button>
+        <button class="nav-item" data-page="projects">📁 <span>Další projekty</span></button>
+        <button class="nav-item" data-page="notes">📝 <span>Poznámky</span></button>
+        <button class="nav-item" data-page="settings">⚙️ <span>Nastavení</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <small id="loggedUserLabel">Nepřihlášen</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuBtn" class="icon-btn mobile-only">☰</button>
+        <div>
+          <h2 id="pageTitle">Domů</h2>
+          <p id="pageSubtitle">Přehled Kvaltík Hubu</p>
+        </div>
+        <div class="top-actions">
+          <div class="top-clock" title="Aktuální čas">
+            <span>🕐</span>
+            <div>
+              <strong id="topClock">--:--</strong>
+              <small id="topClockDate">—</small>
+            </div>
+          </div>
+          <button id="themeBtn" class="icon-btn" title="Přepnout vzhled">🌙</button>
+          <button id="logoutBtn" class="secondary-btn">Odhlásit</button>
+        </div>
+      </header>
+
+      <section class="page active" id="page-dashboard">
+        <div class="hero">
+          <div>
+            <span class="eyebrow">Vítej zpátky</span>
+            <h3 id="welcomeTitle">Kvaltík Hub 🚜🚛</h3>
+            <p>Jedno místo pro ETS 2, Farming Simulator, projekty, sociální sítě, Discord a tvoje obrázky.</p>
+          </div>
+          <div class="hero-badge" id="heroBadge">K</div>
+        </div>
+
+        
+        <div class="dashboard-live-grid">
+          <div class="panel live-card">
+            <div class="live-card-icon">🕐</div>
+            <div>
+              <small>Aktuální čas</small>
+              <strong id="currentClock">--:--:--</strong>
+              <span id="currentDate">—</span>
+            </div>
+          </div>
+
+          <div class="panel live-card weather-card">
+            <div class="live-card-icon" id="weatherIcon">🌦️</div>
+            <div>
+              <small id="weatherCityLabel">Počasí</small>
+              <strong id="weatherTemp">— °C</strong>
+              <span id="weatherText">Načítám...</span>
+            </div>
+            <button class="action-btn weather-refresh" id="weatherRefreshBtn" title="Obnovit počasí">🔄</button>
+          </div>
+
+          <div class="panel live-card">
+            <div class="live-card-icon">👥</div>
+            <div>
+              <small>Přátelé</small>
+              <strong id="dashboardFriendsCount">0</strong>
+              <span>uložených kontaktů</span>
+            </div>
+          </div>
+
+          <div class="panel live-card">
+            <div class="live-card-icon">🎵</div>
+            <div>
+              <small>Hudba</small>
+              <strong id="dashboardTrackName">Nic nehraje</strong>
+              <span id="dashboardTrackArtist">Vyber skladby dole</span>
+            </div>
+          </div>
+        </div>
+<div class="stats-grid">
+          <div class="stat-card"><span>🚛</span><div><strong id="statEtsTrips">0</strong><small>ETS 2 jízd</small></div></div>
+          <div class="stat-card"><span>🛣️</span><div><strong id="statEtsKm">0 km</strong><small>ETS 2 kilometrů</small></div></div>
+          <div class="stat-card"><span>🚜</span><div><strong id="statFarmJobs">0</strong><small>Farming záznamů</small></div></div>
+          <div class="stat-card"><span>🖼️</span><div><strong id="statImages">0</strong><small>Obrázků</small></div></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Poslední ETS 2 jízdy</h3><button class="link-btn" data-go="ets2">Otevřít</button></div>
+            <div id="recentEts" class="mini-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Poslední Farming práce</h3><button class="link-btn" data-go="farming">Otevřít</button></div>
+            <div id="recentFarm" class="mini-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-ets2">
+        <div class="section-head">
+          <div><h3>🚛 Kniha jízd ETS 2</h3><p>Evidence tras, nákladů, kilometrů, výdělků a jízd pro virtuální firmu.</p></div>
+          <button class="primary-btn" id="addEtsBtn">+ Přidat jízdu</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card"><span>📘</span><div><strong id="etsTripsStat">0</strong><small>Jízd</small></div></div>
+          <div class="stat-card"><span>🛣️</span><div><strong id="etsKmStat">0 km</strong><small>Kilometrů</small></div></div>
+          <div class="stat-card"><span>💰</span><div><strong id="etsIncomeStat">0 €</strong><small>Výdělek</small></div></div>
+          <div class="stat-card"><span>🏢</span><div><strong id="etsCompanyTripsStat">0</strong><small>Firemních jízd</small></div></div>
+        </div>
+
+        <div class="panel table-panel"><div class="table-wrap">
+          <table>
+            <thead><tr><th>Datum</th><th>Trasa</th><th>Vozidlo</th><th>Náklad</th><th>Firma</th><th>Km</th><th>Výdělek</th><th></th></tr></thead>
+            <tbody id="etsTableBody"></tbody>
+          </table>
+        </div></div>
+      </section>
+
+      <section class="page" id="page-company">
+        <div class="section-head">
+          <div><h3>🏢 Virtuální firma ETS 2</h3><p>Správa vlastní dopravní společnosti, řidičů, vozového parku a financí.</p></div>
+          <button class="primary-btn" id="addCompanyBtn">+ Založit firmu</button>
+        </div>
+
+        <div id="companyEmpty" class="panel company-empty">
+          <div class="company-empty-icon">🏢</div>
+          <h3>Zatím nemáš žádnou virtuální firmu</h3>
+          <p>Založ si dopravní společnost a propojuj s ní své ETS 2 jízdy.</p>
+          <button class="primary-btn" id="addCompanyBtn2">Založit virtuální firmu</button>
+        </div>
+
+        <div id="companyContent" style="display:none">
+          <div class="company-hero panel">
+            <div class="company-logo" id="companyLogoBox">K</div>
+            <div class="company-hero-text">
+              <span class="eyebrow">Virtuální dopravní společnost</span>
+              <h3 id="companyNameDisplay">Kvaltík Transport</h3>
+              <p id="companyDescDisplay">—</p>
+              <div class="company-meta">
+                <span id="companyHqDisplay">📍 —</span>
+                <span id="companyFoundedDisplay">📅 —</span>
+              </div>
+            </div>
+            <div class="company-actions">
+              <button class="secondary-btn" id="editCompanyBtn">Upravit firmu</button>
+              <button class="danger-btn" id="deleteCompanyBtn">Smazat firmu</button>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card"><span>📦</span><div><strong id="companyTripsStat">0</strong><small>Zakázek</small></div></div>
+            <div class="stat-card"><span>🛣️</span><div><strong id="companyKmStat">0 km</strong><small>Kilometrů</small></div></div>
+            <div class="stat-card"><span>💰</span><div><strong id="companyIncomeStat">0 €</strong><small>Příjmy z jízd</small></div></div>
+            <div class="stat-card"><span>👥</span><div><strong id="companyDriversStat">0</strong><small>Řidičů</small></div></div>
+          </div>
+
+          <div class="company-tabs">
+            <button class="company-tab active" data-company-tab="overview">Přehled</button>
+            <button class="company-tab" data-company-tab="drivers">Řidiči</button>
+            <button class="company-tab" data-company-tab="fleet">Vozový park</button>
+            <button class="company-tab" data-company-tab="finance">Finance</button>
+          </div>
+
+          <div class="company-tab-panel active" id="company-tab-overview">
+            <div class="grid-2">
+              <div class="panel">
+                <div class="panel-head"><h3>Poslední firemní jízdy</h3><button class="link-btn" data-go="ets2">Kniha jízd</button></div>
+                <div id="companyRecentTrips" class="mini-list"></div>
+              </div>
+              <div class="panel">
+                <h3>Bilance firmy</h3>
+                <div class="balance-row"><span>Příjmy z jízd</span><strong id="companyRevenue">0 €</strong></div>
+                <div class="balance-row"><span>Ostatní příjmy</span><strong id="companyExtraIncome">0 €</strong></div>
+                <div class="balance-row"><span>Výdaje</span><strong id="companyExpenses">0 €</strong></div>
+                <div class="balance-row total"><span>Zůstatek</span><strong id="companyBalance">0 €</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="company-tab-panel" id="company-tab-drivers">
+            <div class="section-head mini-section">
+              <div><h3>👥 Řidiči</h3><p>Seznam zaměstnanců a jejich statistik.</p></div>
+              <button class="primary-btn" id="addDriverBtn">+ Přidat řidiče</button>
+            </div>
+            <div id="driversGrid" class="project-grid"></div>
+          </div>
+
+          <div class="company-tab-panel" id="company-tab-fleet">
+            <div class="section-head mini-section">
+              <div><h3>🚛 Vozový park</h3><p>Tahače a další vozidla virtuální firmy.</p></div>
+              <button class="primary-btn" id="addVehicleBtn">+ Přidat vozidlo</button>
+            </div>
+            <div id="fleetGrid" class="project-grid"></div>
+          </div>
+
+          <div class="company-tab-panel" id="company-tab-finance">
+            <div class="section-head mini-section">
+              <div><h3>💰 Finance</h3><p>Palivo, servis, pokuty a další firemní příjmy či výdaje.</p></div>
+              <button class="primary-btn" id="addFinanceBtn">+ Přidat položku</button>
+            </div>
+            <div class="panel table-panel"><div class="table-wrap">
+              <table>
+                <thead><tr><th>Datum</th><th>Typ</th><th>Kategorie</th><th>Popis</th><th>Částka</th><th></th></tr></thead>
+                <tbody id="financeTableBody"></tbody>
+              </table>
+            </div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-farming">
+        <div class="section-head">
+          <div><h3>🚜 Farming kniha jízd/prací</h3><p>Evidence práce na farmě, strojů, polí a motohodin.</p></div>
+          <button class="primary-btn" id="addFarmBtn">+ Přidat záznam</button>
+        </div>
+        <div class="panel table-panel"><div class="table-wrap">
+          <table><thead><tr><th>Datum</th><th>Mapa/Farma</th><th>Stroj</th><th>Práce</th><th>Pole</th><th>Hodiny</th><th></th></tr></thead><tbody id="farmTableBody"></tbody></table>
+        </div></div>
+      </section>
+
+      
+      <section class="page" id="page-ets-fleet">
+        <div class="section-head">
+          <div><h3>🚛 ETS 2 – Vozový park</h3><p>Samostatný přehled tahačů a firemních vozidel.</p></div>
+          <button class="primary-btn" id="addEtsVehicleBtn">+ Přidat vozidlo</button>
+        </div>
+        <div id="etsFleetCards" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-ets-finance">
+        <div class="section-head">
+          <div><h3>💰 ETS 2 – Finance</h3><p>Příjmy a výdaje spojené s ETS 2.</p></div>
+          <button class="primary-btn" id="addEtsFinanceBtn">+ Přidat položku</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><span>💵</span><div><strong id="etsFinanceIncome">0 €</strong><small>Příjmy</small></div></div>
+          <div class="stat-card"><span>💸</span><div><strong id="etsFinanceExpense">0 €</strong><small>Výdaje</small></div></div>
+          <div class="stat-card"><span>📊</span><div><strong id="etsFinanceBalance">0 €</strong><small>Bilance</small></div></div>
+          <div class="stat-card"><span>🧾</span><div><strong id="etsFinanceCount">0</strong><small>Položek</small></div></div>
+        </div>
+        <div class="panel table-panel"><div class="table-wrap">
+          <table><thead><tr><th>Datum</th><th>Typ</th><th>Kategorie</th><th>Popis</th><th>Částka</th><th></th></tr></thead><tbody id="etsFinanceTable"></tbody></table>
+        </div></div>
+      </section>
+
+      <section class="page" id="page-farm-machines">
+        <div class="section-head">
+          <div><h3>🚜 Farming – Stroje</h3><p>Evidence traktorů, kombajnů, řezaček a další techniky.</p></div>
+          <button class="primary-btn" id="addFarmMachineBtn">+ Přidat stroj</button>
+        </div>
+        <div id="farmMachinesGrid" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-farm-fields">
+        <div class="section-head">
+          <div><h3>🌾 Farming – Pole</h3><p>Evidence polí, plodin a aktuálního stavu.</p></div>
+          <button class="primary-btn" id="addFarmFieldBtn">+ Přidat pole</button>
+        </div>
+        <div id="farmFieldsGrid" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-farm-storage">
+        <div class="section-head">
+          <div><h3>🏚️ Farming – Sklady</h3><p>Sila, sklady a zásoby komodit.</p></div>
+          <button class="primary-btn" id="addFarmStorageBtn">+ Přidat sklad</button>
+        </div>
+        <div id="farmStorageGrid" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-farm-finance">
+        <div class="section-head">
+          <div><h3>💰 Farming – Finance</h3><p>Příjmy a výdaje farmy.</p></div>
+          <button class="primary-btn" id="addFarmFinanceBtn">+ Přidat položku</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><span>💵</span><div><strong id="farmFinanceIncome">0 €</strong><small>Příjmy</small></div></div>
+          <div class="stat-card"><span>💸</span><div><strong id="farmFinanceExpense">0 €</strong><small>Výdaje</small></div></div>
+          <div class="stat-card"><span>📊</span><div><strong id="farmFinanceBalance">0 €</strong><small>Bilance</small></div></div>
+          <div class="stat-card"><span>🧾</span><div><strong id="farmFinanceCount">0</strong><small>Položek</small></div></div>
+        </div>
+        <div class="panel table-panel"><div class="table-wrap">
+          <table><thead><tr><th>Datum</th><th>Typ</th><th>Kategorie</th><th>Popis</th><th>Částka</th><th></th></tr></thead><tbody id="farmFinanceTable"></tbody></table>
+        </div></div>
+      </section>
+
+
+      <section class="page" id="page-friends">
+        <div class="section-head">
+          <div><h3>👥 Přátelé</h3><p>Seznam kamarádů, spoluhráčů a kontaktů pro ETS 2, Farming a Discord.</p></div>
+          <button class="primary-btn" id="addFriendBtn">+ Přidat přítele</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card"><span>👥</span><div><strong id="friendsCount">0</strong><small>Přátel</small></div></div>
+          <div class="stat-card"><span>⭐</span><div><strong id="favoriteFriendsCount">0</strong><small>Oblíbených</small></div></div>
+          <div class="stat-card"><span>🚛</span><div><strong id="etsFriendsCount">0</strong><small>ETS 2 kontaktů</small></div></div>
+          <div class="stat-card"><span>🚜</span><div><strong id="farmFriendsCount">0</strong><small>Farming kontaktů</small></div></div>
+        </div>
+
+        <div class="panel friends-toolbar">
+          <input id="friendSearch" class="search-input" placeholder="🔍 Hledat přítele..." />
+          <select id="friendFilter">
+            <option value="all">Všichni</option>
+            <option value="favorite">Oblíbení ⭐</option>
+            <option value="ets">ETS 2 🚛</option>
+            <option value="farm">Farming 🚜</option>
+            <option value="discord">Discord 💬</option>
+          </select>
+        </div>
+
+        <div id="friendsGrid" class="project-grid"></div>
+      </section>
+
+<section class="page" id="page-gallery">
+        <div class="section-head">
+          <div><h3>🖼️ Obrázky</h3><p>Nahraj si screenshoty, náhledovky nebo jiné obrázky.</p></div>
+          <label class="primary-btn file-upload-btn">+ Nahrát obrázky
+            <input type="file" id="imageInput" accept="image/*" multiple />
+          </label>
+        </div>
+        <div id="galleryGrid" class="gallery-grid"></div>
+      </section>
+<section class="page" id="page-socials">
+        <div class="section-head"><div><h3>🌐 Sociální sítě</h3><p>Všechny odkazy na jednom místě.</p></div></div>
+        <form class="panel form-grid" id="socialForm">
+          <label>YouTube<input id="socialYoutube" placeholder="https://youtube.com/..." /></label>
+          <label>Instagram<input id="socialInstagram" placeholder="https://instagram.com/..." /></label>
+          <label>Twitch<input id="socialTwitch" placeholder="https://twitch.tv/..." /></label>
+          <label>TikTok<input id="socialTiktok" placeholder="https://tiktok.com/..." /></label>
+          <label>Web<input id="socialWeb" placeholder="https://..." /></label>
+          <button class="primary-btn full" type="submit">Uložit odkazy</button>
+        </form>
+        <div id="socialCards" class="social-grid"></div>
+      </section>
+
+      <section class="page" id="page-discord">
+        <div class="section-head">
+          <div><h3>💬 Discord</h3><p>Pozvánka a informace o tvém Discord serveru.</p></div>
+          <a id="discordJoinTop" class="discord-open disabled" href="#" target="_blank" rel="noopener">Připojit se na Discord</a>
+        </div>
+
+        <div class="discord-dashboard">
+          <div class="panel discord-server-card">
+            <div class="discord-server-header">
+              <div class="discord-server-logo" id="discordServerIcon">💬</div>
+              <div>
+                <span class="eyebrow">Discord server</span>
+                <h3 id="discordLiveName">Kvaltík Community</h3>
+                <p id="discordLiveDescription">Komunita kolem Kvaltík Hubu.</p>
+              </div>
+            </div>
+
+            <div class="discord-live-stats">
+              <div class="discord-stat">
+                <strong id="discordOnlineCount">—</strong>
+                <small>online</small>
+              </div>
+              <div class="discord-stat">
+                <strong id="discordChannelCount">—</strong>
+                <small>veřejných kanálů</small>
+              </div>
+              <div class="discord-stat">
+                <strong id="discordWidgetStatus">—</strong>
+                <small>server widget</small>
+              </div>
+            </div>
+
+            <div class="discord-server-actions">
+              <a id="discordLiveInvite" class="discord-open disabled" href="#" target="_blank" rel="noopener">🚀 Připojit se k serveru</a>
+              <button class="secondary-btn" id="refreshDiscordInfoBtn" type="button">🔄 Obnovit informace</button>
+            </div>
+
+            <p class="discord-hint" id="discordServerHint">
+              Živé údaje se načtou, pokud vyplníš ID serveru a máš na Discordu povolený Server Widget.
+            </p>
+          </div>
+
+          <div class="panel">
+            <h3>ℹ️ Informace o Discordu</h3>
+            <div class="discord-info-list">
+              <div>✅ Přímá pozvánka na server</div>
+              <div>✅ Název a popis serveru</div>
+              <div>✅ Počet online členů přes Server Widget</div>
+              <div>✅ Veřejné voice/stage kanály</div>
+              <div>❌ Žádné přihlašování přes Discord</div>
+            </div>
+          </div>
+        </div>
+
+        <form class="panel form-grid" id="discordForm">
+          <div class="full">
+            <h3>⚙️ Nastavení Discord serveru</h3>
+            <p>Vyplň údaje o svém serveru. Application ID ani Client Secret už nejsou potřeba.</p>
+          </div>
+          <label>ID Discord serveru<input id="discordGuildId" placeholder="Např. 123456789012345678" /></label>
+          <label>Název serveru<input id="discordName" placeholder="Kvaltík Community" /></label>
+          <label class="full">Pozvánka na server<input id="discordInvite" placeholder="https://discord.gg/..." /></label>
+          <label class="full">Popis serveru<textarea id="discordDescription" rows="5" placeholder="Komunita kolem Farming Simulatoru, ETS 2 a streamů."></textarea></label>
+          <button class="primary-btn full" type="submit">Uložit informace</button>
+        </form>
+      </section>
+
+      <section class="page" id="page-projects">
+        <div class="section-head">
+          <div><h3>📁 Další projekty</h3><p>Nápady a rozpracované projekty.</p></div>
+          <button class="primary-btn" id="addProjectBtn">+ Nový projekt</button>
+        </div>
+        <div id="projectsGrid" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-notes">
+        <div class="section-head">
+          <div><h3>📝 Poznámky</h3><p>Nápady na videa, úkoly a rychlé zápisky.</p></div>
+          <button class="primary-btn" id="addNoteBtn">+ Nová poznámka</button>
+        </div>
+        <div id="notesGrid" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="section-head">
+          <div><h3>⚙️ Nastavení</h3><p>Profil, účet, vzhled, zálohy a správa dat.</p></div>
+        </div>
+
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-settings-tab="profile">👤 O mně</button>
+          <button class="settings-tab" data-settings-tab="account">🔐 Účet</button>
+          <button class="settings-tab" data-settings-tab="backup">💾 Záloha</button>
+          <button class="settings-tab" data-settings-tab="updates">🔄 Aktualizace</button>
+        </div>
+
+        <div class="settings-panel active" id="settings-tab-profile">
+          <div class="grid-2">
+            <div class="panel profile-card">
+              <div class="avatar image-avatar" id="profileAvatar">K</div>
+              <h3 id="profileDisplayName">Kvaltík</h3>
+              <p id="profileDisplayBio">Farming, kamiony, doprava a tvorba videí.</p>
+            </div>
+
+            <form class="panel form-grid" id="aboutForm">
+              <label>Přezdívka<input id="aboutName" placeholder="Kvaltík" /></label>
+              <label>Krátké motto<input id="aboutMotto" placeholder="Farming • ETS 2 • YouTube" /></label>
+              <label class="full">Profilový obrázek<input type="file" id="profileImageInput" accept="image/*" /></label>
+              <label class="full">O mně<textarea id="aboutBio" rows="6" placeholder="Napiš něco o sobě..."></textarea></label>
+              <button class="primary-btn full" type="submit">Uložit profil</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-tab-account">
+          <div class="grid-2">
+            <div class="panel">
+              <h3>🔐 Účet</h3>
+              <p id="accountInfo">—</p>
+            </div>
+
+            <div class="panel">
+              <h3>🎨 Vzhled</h3>
+              <p>Vzhled aplikace můžeš měnit tlačítkem v horní liště.</p>
+              <button class="secondary-btn" type="button" onclick="document.getElementById('themeBtn').click()">Přepnout světlý / tmavý režim</button>
+            </div>
+
+            <div class="panel">
+              <h3>🌦️ Počasí</h3>
+              <p>Nastav město, které se bude zobrazovat na hlavní stránce.</p>
+              <div class="form-grid one-column">
+                <label class="full">Město
+                  <input id="weatherCityInput" placeholder="Praha" />
+                </label>
+                <button class="primary-btn full" id="saveWeatherCityBtn" type="button">Uložit město</button>
+              </div>
+            </div>
+
+
+            <div class="panel danger-panel">
+              <h3>Odhlášení</h3>
+              <p>Odhlásí aktuální účet z Kvaltík Hubu.</p>
+              <button class="secondary-btn" type="button" onclick="document.getElementById('logoutBtn').click()">Odhlásit se</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-tab-backup">
+          <div class="grid-2">
+            <div class="panel">
+              <h3>💾 Záloha dat</h3>
+              <p>Stáhni si data aktuálního účtu.</p>
+              <button class="primary-btn" id="exportBtn">Exportovat data</button>
+            </div>
+
+            <div class="panel">
+              <h3>📥 Obnovit data</h3>
+              <p>Načti dříve vytvořenou zálohu.</p>
+              <label class="file-label">Vybrat JSON soubor<input type="file" id="importInput" accept=".json,application/json" /></label>
+            </div>
+
+            <div class="panel danger-panel">
+              <h3>🗑️ Vymazat data účtu</h3>
+              <p>Smaže jízdy, projekty, poznámky, obrázky i další data aktuálního účtu.</p>
+              <button class="danger-btn" id="clearBtn">Vymazat data</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-tab-updates">
+          <div class="update-layout">
+            <div class="panel update-main-card">
+              <div class="update-header">
+                <div class="update-app-icon">K</div>
+                <div>
+                  <span class="eyebrow">Kvaltík Hub Desktop</span>
+                  <h3>Aktualizace aplikace</h3>
+                  <p id="updateStatusText">Zjišťuji stav aktualizací...</p>
+                </div>
+                <span class="update-status-pill" id="updateStatusPill">Čekám</span>
+              </div>
+
+              <div class="update-version-grid">
+                <div class="update-version-box">
+                  <small>Aktuální verze</small>
+                  <strong id="updateCurrentVersion">—</strong>
+                </div>
+                <div class="update-version-arrow">→</div>
+                <div class="update-version-box">
+                  <small>Nejnovější verze</small>
+                  <strong id="updateLatestVersion">—</strong>
+                </div>
+              </div>
+
+              <div class="update-progress-wrap" id="updateProgressWrap" style="display:none">
+                <div class="update-progress-head">
+                  <span id="updateProgressLabel">Stahuji aktualizaci…</span>
+                  <strong id="updateProgressPercent">0 %</strong>
+                </div>
+                <div class="update-progress-bar">
+                  <div class="update-progress-fill" id="updateProgressFill"></div>
+                </div>
+                <small id="updateProgressDetail">—</small>
+              </div>
+
+              <div class="update-actions">
+                <button class="primary-btn" id="checkUpdatesBtn" type="button">🔄 Zkontrolovat aktualizace</button>
+                <button class="secondary-btn" id="downloadUpdateBtn" type="button" style="display:none">⬇️ Stáhnout aktualizaci</button>
+                <button class="primary-btn update-install-btn" id="installUpdateBtn" type="button" style="display:none">🚀 Restartovat a nainstalovat</button>
+              </div>
+
+              <div class="update-release-notes" id="updateReleaseNotes" style="display:none">
+                <h4>📝 Co je nového</h4>
+                <p id="updateReleaseNotesText">—</p>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3>⚙️ Automatické aktualizace</h3>
+              <label class="setting-toggle">
+                <div>
+                  <strong>Automaticky kontrolovat</strong>
+                  <small>Po spuštění aplikace zkontroluje novou verzi.</small>
+                </div>
+                <input type="checkbox" id="autoCheckUpdatesToggle" checked />
+              </label>
+
+              <label class="setting-toggle">
+                <div>
+                  <strong>Automaticky stahovat</strong>
+                  <small>Nová verze se stáhne na pozadí. Instalaci stále potvrdíš.</small>
+                </div>
+                <input type="checkbox" id="autoDownloadUpdatesToggle" />
+              </label>
+
+              <div class="update-config-info">
+                <strong id="updateConfigTitle">GitHub Releases</strong>
+                <p id="updateConfigText">Konfigurace se načte z instalátoru aplikace.</p>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3>🛡️ Tvoje data zůstanou zachovaná</h3>
+              <p>Aktualizace nahrazuje soubory programu, ale nesmaže tvůj profil, ETS 2 jízdy, Farming data, přátele, nastavení ani playlist.</p>
+              <p class="update-small-note">Automatické aktualizace fungují v nainstalované NSIS verzi Kvaltík Hubu. Portable a vývojová verze aktualizace pouze kontrolují omezeně nebo je mají vypnuté.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalTitle">Přidat</h3>
+        <button class="icon-btn" id="modalClose">✕</button>
+      </div>
+      <form id="modalForm" class="form-grid"></form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <div class="mini-player" id="miniPlayer">
+    <div class="mini-player-track">
+      <div class="mini-player-cover">🎵</div>
+      <div class="mini-player-info">
+        <strong id="musicTrackTitle">Žádná skladba</strong>
+        <span id="musicTrackMeta">Klikni na „Přidat hudbu“</span>
+      </div>
+    </div>
+
+    <div class="mini-player-controls">
+      <button class="music-btn" id="musicPrevBtn" title="Předchozí">⏮</button>
+      <button class="music-btn play" id="musicPlayBtn" title="Přehrát / pozastavit">▶</button>
+      <button class="music-btn" id="musicNextBtn" title="Další">⏭</button>
+    </div>
+
+    <div class="mini-player-progress">
+      <span id="musicCurrentTime">0:00</span>
+      <input type="range" id="musicProgress" min="0" max="100" value="0" />
+      <span id="musicDuration">0:00</span>
+    </div>
+
+    <div class="mini-player-actions">
+      <span>🔊</span>
+      <input type="range" id="musicVolume" min="0" max="100" value="75" title="Hlasitost" />
+      <button class="secondary-btn music-add-btn" id="addMusicBtn">+ Přidat hudbu</button>
+      <button class="action-btn" id="musicPlaylistBtn" title="Playlist">☰</button>
+    </div>
+  </div>
+
+  <div class="music-playlist-drawer" id="musicPlaylistDrawer">
+    <div class="panel-head">
+      <h3>🎵 Playlist</h3>
+      <button class="icon-btn" id="closePlaylistBtn">✕</button>
+    </div>
+    <div id="musicPlaylistList" class="music-playlist-list"></div>
+  </div>
+
+  <audio id="musicAudio" preload="metadata"></audio>
+
+  <!-- app.js musí být až za celým UI, jinak mini přehrávač ještě neexistuje. -->
+  <script src="app.js"></script>
+
+</body>
+</html>

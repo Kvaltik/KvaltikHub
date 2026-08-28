@@ -1,0 +1,1152 @@
+// Kvaltík Hub persistent storage.
+// Desktop verze ukládá data do Electron userData, takže nezávisí na náhodném HTTP portu.
+const hubStorage = window.kvaltikDesktop?.storageGet ? {
+  getItem(key){
+    const value=window.kvaltikDesktop.storageGet(key);
+    return value===undefined||value===null?null:String(value);
+  },
+  setItem(key,value){
+    window.kvaltikDesktop.storageSet(key,String(value));
+  },
+  removeItem(key){
+    window.kvaltikDesktop.storageRemove(key);
+  }
+} : localStorage;
+
+const USERS_KEY="kvaltikHubUsersV2";
+const SESSION_KEY="kvaltikHubSessionV2";
+
+const defaultUserData={
+  ets2:[],farming:[],gallery:[],
+  about:{name:"Kvaltík",motto:"Farming • ETS 2 • YouTube",bio:"Farming, kamiony, doprava a tvorba videí.",profileImage:""},
+  socials:{youtube:"",instagram:"",twitch:"",tiktok:"",web:""},
+  discord:{name:"Kvaltík Community",invite:"",description:"Přidej odkaz na svůj Discord server."},
+  company:null,drivers:[],fleet:[],finance:[],
+  etsFinance:[],farmMachines:[],farmFields:[],farmStorage:[],farmFinance:[],
+  friends:[],weatherCity:"Praha",
+  updateSettings:{autoCheck:true,autoDownload:false},
+  projects:[],notes:[],theme:"dark"
+};
+
+let currentUser=null;
+let data=structuredClone(defaultUserData);
+
+function getUsers(){try{return JSON.parse(hubStorage.getItem(USERS_KEY))||{}}catch{return {}}}
+function saveUsers(users){hubStorage.setItem(USERS_KEY,JSON.stringify(users))}
+function simpleHash(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}
+  return (h>>>0).toString(16);
+}
+function userDataKey(username){return "kvaltikHubDataV2_"+username.toLowerCase()}
+function loadUserData(username){
+  try{
+    const saved=JSON.parse(hubStorage.getItem(userDataKey(username)));
+    return saved?{...structuredClone(defaultUserData),...saved}:structuredClone(defaultUserData)
+  }catch{return structuredClone(defaultUserData)}
+}
+function saveData(message){
+  if(!currentUser)return;
+  hubStorage.setItem(userDataKey(currentUser.username),JSON.stringify(data));
+  renderAll();
+  if(message)toast(message);
+}
+function setSession(username,remember=true){
+  if(remember){
+    hubStorage.setItem(SESSION_KEY,username);
+    sessionStorage.removeItem(SESSION_KEY);
+  }else{
+    hubStorage.removeItem(SESSION_KEY);
+    sessionStorage.setItem(SESSION_KEY,username);
+  }
+}
+function clearSession(){
+  hubStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+const authScreen=document.getElementById("authScreen");
+const appShell=document.getElementById("appShell");
+
+function showApp(){
+  authScreen.classList.add("hidden");
+  appShell.classList.remove("locked");
+  document.getElementById("loggedUserLabel").textContent="👤 "+currentUser.username;
+  document.getElementById("accountInfo").textContent=`Uživatel: ${currentUser.username} • E-mail: ${currentUser.email}`;
+  document.getElementById("welcomeTitle").textContent=`Vítej, ${data.about.name||currentUser.username}! 🚜🚛`;
+  renderAll();
+  setTimeout(()=>initUpdaterUi(true),1000);
+}
+function showAuth(){
+  authScreen.classList.remove("hidden");
+  appShell.classList.add("locked");
+  const loading=document.getElementById("loadingScreen");
+  if(loading){
+    loading.classList.add("hide");
+    setTimeout(()=>loading.remove(),500);
+  }
+}
+
+function login(username,password,remember=true){
+  const users=getUsers();
+  const key=username.trim().toLowerCase();
+  const user=users[key];
+  if(!user||user.passwordHash!==simpleHash(password))return false;
+  currentUser={username:user.username,email:user.email};
+  data=loadUserData(user.username);
+  setSession(user.username,remember);
+  showApp();
+  return true;
+}
+function register(username,email,password){
+  const users=getUsers();
+  const key=username.trim().toLowerCase();
+  if(users[key])return {ok:false,msg:"Toto uživatelské jméno už existuje."};
+  users[key]={username:username.trim(),email:email.trim(),passwordHash:simpleHash(password)};
+  saveUsers(users);
+  hubStorage.setItem(userDataKey(username),JSON.stringify(structuredClone(defaultUserData)));
+  return {ok:true};
+}
+document.querySelectorAll(".auth-tab").forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll(".auth-tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".auth-form").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById(btn.dataset.auth+"Form").classList.add("active");
+});
+document.getElementById("loginForm").onsubmit=e=>{
+  e.preventDefault();
+  const remember=document.getElementById("rememberLogin").checked;
+  if(!login(
+    document.getElementById("loginUsername").value,
+    document.getElementById("loginPassword").value,
+    remember
+  )){
+    toast("Nesprávné jméno nebo heslo.");
+  }
+};
+document.getElementById("registerForm").onsubmit=e=>{
+  e.preventDefault();
+  const u=document.getElementById("registerUsername").value.trim();
+  const email=document.getElementById("registerEmail").value.trim();
+  const p=document.getElementById("registerPassword").value;
+  const p2=document.getElementById("registerPassword2").value;
+  if(p!==p2){toast("Hesla se neshodují.");return}
+  const r=register(u,email,p);
+  if(!r.ok){toast(r.msg);return}
+  toast("Účet byl vytvořen. Teď se můžeš přihlásit.");
+  document.querySelector('[data-auth="login"]').click();
+  document.getElementById("loginUsername").value=u;
+};
+document.getElementById("logoutBtn").onclick=()=>{clearSession();currentUser=null;data=structuredClone(defaultUserData);showAuth()};
+
+function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function formatDate(v){if(!v)return"—";return new Date(v+"T12:00:00").toLocaleDateString("cs-CZ")}
+function number(v){return new Intl.NumberFormat("cs-CZ",{maximumFractionDigits:1}).format(Number(v||0))}
+function euro(v){return new Intl.NumberFormat("cs-CZ",{maximumFractionDigits:0}).format(Number(v||0))+" €"}
+
+const pages={
+  dashboard:["Domů","Přehled Kvaltík Hubu"],ets2:["ETS 2","Kniha jízd Euro Truck Simulator 2"],company:["Virtuální firma","ETS 2 dopravní společnost"],
+  "ets-fleet":["ETS 2 – Vozový park","Tahače a firemní vozidla"],
+  "ets-finance":["ETS 2 – Finance","Příjmy a výdaje"],
+  "farm-machines":["Farming – Stroje","Evidence zemědělské techniky"],
+  "farm-fields":["Farming – Pole","Pole, plodiny a stavy"],
+  "farm-storage":["Farming – Sklady","Sila, sklady a zásoby"],
+  "farm-finance":["Farming – Finance","Příjmy a výdaje farmy"],
+  friends:["Přátelé","Kamarádi, spoluhráči a kontakty"],
+  farming:["Farming","Kniha jízd a prací"],gallery:["Obrázky","Screenshoty a náhledovky"],socials:["Sociální sítě","Odkazy na profily"],discord:["Discord","Komunitní server"],
+  projects:["Další projekty","Nápady a rozpracované věci"],notes:["Poznámky","Rychlé zápisky"],settings:["Nastavení","Zálohy a účet"]
+};
+function goTo(page){
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".nav-item,.nav-subitem").forEach(x=>x.classList.remove("active"));
+  document.getElementById("page-"+page)?.classList.add("active");
+  const navTarget=document.querySelector(`[data-page="${page}"]`);
+  navTarget?.classList.add("active");
+  navTarget?.closest(".nav-folder")?.classList.add("open");
+  document.getElementById("pageTitle").textContent=pages[page][0];
+  document.getElementById("pageSubtitle").textContent=pages[page][1];
+  document.getElementById("sidebar").classList.remove("open");
+}
+document.querySelectorAll(".nav-item,.nav-subitem").forEach(b=>b.onclick=()=>goTo(b.dataset.page));
+document.querySelectorAll(".nav-folder-toggle").forEach(b=>b.onclick=()=>b.closest(".nav-folder").classList.toggle("open"));
+document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>goTo(b.dataset.go));
+
+function renderDashboard(){
+  document.getElementById("statEtsTrips").textContent=data.ets2.length;
+  document.getElementById("statEtsKm").textContent=number(data.ets2.reduce((s,x)=>s+Number(x.km||0),0))+" km";
+  document.getElementById("statFarmJobs").textContent=data.farming.length;
+  document.getElementById("statImages").textContent=data.gallery.length;
+  document.getElementById("welcomeTitle").textContent=`Vítej, ${data.about.name||currentUser?.username||"Kvaltík"}! 🚜🚛`;
+
+  const ets=[...data.ets2].slice(-4).reverse();
+  document.getElementById("recentEts").innerHTML=ets.length?ets.map(x=>`<div class="mini-item"><strong>${esc(x.from)} → ${esc(x.to)}</strong><small>${formatDate(x.date)} • ${esc(x.truck)} • ${number(x.km)} km</small></div>`).join(""):`<div class="empty">Zatím tu není žádná ETS 2 jízda.</div>`;
+  const farm=[...data.farming].slice(-4).reverse();
+  document.getElementById("recentFarm").innerHTML=farm.length?farm.map(x=>`<div class="mini-item"><strong>${esc(x.work)}</strong><small>${formatDate(x.date)} • ${esc(x.machine)} • ${esc(x.map)}</small></div>`).join(""):`<div class="empty">Zatím tu není žádná Farming práce.</div>`;
+}
+function renderEts(){
+  const tbody=document.getElementById("etsTableBody");
+  const totalKm=data.ets2.reduce((s,x)=>s+Number(x.km||0),0);
+  const totalIncome=data.ets2.reduce((s,x)=>s+Number(x.income||0),0);
+  const companyTrips=data.ets2.filter(x=>x.companyId&&data.company&&x.companyId===data.company.id).length;
+  document.getElementById("etsTripsStat").textContent=data.ets2.length;
+  document.getElementById("etsKmStat").textContent=number(totalKm)+" km";
+  document.getElementById("etsIncomeStat").textContent=euro(totalIncome);
+  document.getElementById("etsCompanyTripsStat").textContent=companyTrips;
+  tbody.innerHTML=data.ets2.length?[...data.ets2].reverse().map((x,ri)=>{
+    const i=data.ets2.length-1-ri;
+    const companyName=x.companyId&&data.company&&x.companyId===data.company.id?data.company.name:(x.company||"—");
+    return `<tr><td>${formatDate(x.date)}</td><td><strong>${esc(x.from)} → ${esc(x.to)}</strong></td><td>${esc(x.truck)}</td><td>${esc(x.cargo)}</td><td>${esc(companyName||"—")}</td><td>${number(x.km)} km</td><td>${euro(x.income)}</td><td><button class="action-btn" onclick="editEts(${i})">✏️</button><button class="action-btn" onclick="deleteEts(${i})">🗑️</button></td></tr>`;
+  }).join(""):`<tr><td colspan="8"><div class="empty">Zatím nemáš žádnou jízdu.</div></td></tr>`;
+}
+
+function currentCompanyTrips(){
+  if(!data.company)return [];
+  return data.ets2.filter(x=>x.companyId===data.company.id);
+}
+function renderCompany(){
+  const empty=document.getElementById("companyEmpty");
+  const content=document.getElementById("companyContent");
+  if(!data.company){
+    empty.style.display="block";content.style.display="none";return;
+  }
+  empty.style.display="none";content.style.display="block";
+  const c=data.company;
+  document.getElementById("companyNameDisplay").textContent=c.name||"Virtuální firma";
+  document.getElementById("companyDescDisplay").textContent=c.description||"Bez popisu";
+  document.getElementById("companyHqDisplay").textContent="📍 "+(c.hq||"Neuvedeno");
+  document.getElementById("companyFoundedDisplay").textContent="📅 "+(c.founded?formatDate(c.founded):"Neuvedeno");
+  const logo=document.getElementById("companyLogoBox");
+  if(c.logo){logo.style.backgroundImage=`url("${c.logo}")`;logo.textContent=""}else{logo.style.backgroundImage="";logo.textContent=(c.name||"K").charAt(0).toUpperCase()}
+
+  const trips=currentCompanyTrips();
+  const km=trips.reduce((s,x)=>s+Number(x.km||0),0);
+  const revenue=trips.reduce((s,x)=>s+Number(x.income||0),0);
+  const extraIncome=data.finance.filter(x=>x.type==="Příjem").reduce((s,x)=>s+Number(x.amount||0),0);
+  const expenses=data.finance.filter(x=>x.type==="Výdaj").reduce((s,x)=>s+Number(x.amount||0),0);
+  document.getElementById("companyTripsStat").textContent=trips.length;
+  document.getElementById("companyKmStat").textContent=number(km)+" km";
+  document.getElementById("companyIncomeStat").textContent=euro(revenue);
+  document.getElementById("companyDriversStat").textContent=data.drivers.length;
+  document.getElementById("companyRevenue").textContent=euro(revenue);
+  document.getElementById("companyExtraIncome").textContent=euro(extraIncome);
+  document.getElementById("companyExpenses").textContent=euro(expenses);
+  document.getElementById("companyBalance").textContent=euro(revenue+extraIncome-expenses);
+
+  document.getElementById("companyRecentTrips").innerHTML=trips.length?[...trips].slice(-5).reverse().map(x=>`<div class="mini-item"><strong>${esc(x.from)} → ${esc(x.to)}</strong><small>${formatDate(x.date)} • ${esc(x.truck)} • ${number(x.km)} km • ${euro(x.income)}</small></div>`).join(""):`<div class="empty">Zatím nejsou žádné firemní jízdy.</div>`;
+
+  document.getElementById("driversGrid").innerHTML=data.drivers.length?data.drivers.map((d,i)=>{
+    const driverTrips=trips.filter(t=>t.driverId===d.id);
+    const dkm=driverTrips.reduce((s,x)=>s+Number(x.km||0),0);
+    const dinc=driverTrips.reduce((s,x)=>s+Number(x.income||0),0);
+    return `<div class="driver-card"><h4>👤 ${esc(d.name)}</h4><p>${esc(d.role||"Řidič")}</p><div class="card-kpis"><div class="card-kpi"><small>Jízdy</small><strong>${driverTrips.length}</strong></div><div class="card-kpi"><small>Kilometry</small><strong>${number(dkm)} km</strong></div><div class="card-kpi"><small>Výdělek</small><strong>${euro(dinc)}</strong></div><div class="card-kpi"><small>Datum nástupu</small><strong>${d.joined?formatDate(d.joined):"—"}</strong></div></div><div class="card-actions"><button class="secondary-btn" onclick="editDriver(${i})">Upravit</button><button class="danger-btn" onclick="deleteDriver(${i})">Smazat</button></div></div>`
+  }).join(""):`<div class="empty" style="grid-column:1/-1">Zatím nemáš žádné řidiče.</div>`;
+
+  document.getElementById("fleetGrid").innerHTML=data.fleet.length?data.fleet.map((v,i)=>`<div class="vehicle-card"><h4>🚛 ${esc(v.brand)} ${esc(v.model)}</h4><p>${esc(v.plate||"Bez SPZ")}</p><div class="card-kpis"><div class="card-kpi"><small>Typ</small><strong>${esc(v.type||"Tahač")}</strong></div><div class="card-kpi"><small>Stav km</small><strong>${number(v.odometer)} km</strong></div><div class="card-kpi"><small>Výkon</small><strong>${esc(v.power||"—")}</strong></div><div class="card-kpi"><small>Stav</small><strong>${esc(v.status||"Aktivní")}</strong></div></div><div class="card-actions"><button class="secondary-btn" onclick="editVehicle(${i})">Upravit</button><button class="danger-btn" onclick="deleteVehicle(${i})">Smazat</button></div></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Vozový park je zatím prázdný.</div>`;
+
+  document.getElementById("financeTableBody").innerHTML=data.finance.length?[...data.finance].reverse().map((f,ri)=>{const i=data.finance.length-1-ri;return `<tr><td>${formatDate(f.date)}</td><td>${esc(f.type)}</td><td>${esc(f.category)}</td><td>${esc(f.description||"—")}</td><td>${f.type==="Výdaj"?"−":"+"}${euro(f.amount)}</td><td><button class="action-btn" onclick="editFinance(${i})">✏️</button><button class="action-btn" onclick="deleteFinance(${i})">🗑️</button></td></tr>`}).join(""):`<tr><td colspan="6"><div class="empty">Zatím tu nejsou žádné finanční položky.</div></td></tr>`;
+}
+
+
+function renderEtsFleetPage(){
+  const el=document.getElementById("etsFleetCards"); if(!el)return;
+  el.innerHTML=data.fleet.length?data.fleet.map((v,i)=>`<div class="vehicle-card"><h4>🚛 ${esc(v.brand)} ${esc(v.model)}</h4><p>${esc(v.plate||"Bez SPZ")}</p><div class="card-kpis"><div class="card-kpi"><small>Typ</small><strong>${esc(v.type||"Tahač")}</strong></div><div class="card-kpi"><small>Stav km</small><strong>${number(v.odometer)} km</strong></div><div class="card-kpi"><small>Výkon</small><strong>${esc(v.power||"—")}</strong></div><div class="card-kpi"><small>Stav</small><strong>${esc(v.status||"Aktivní")}</strong></div></div><div class="card-actions"><button class="secondary-btn" onclick="editVehicle(${i})">Upravit</button><button class="danger-btn" onclick="deleteVehicle(${i})">Smazat</button></div></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Vozový park je prázdný.</div>`;
+}
+function renderMoneySection(items,prefix,tableId){
+  const income=items.filter(x=>x.type==="Příjem").reduce((s,x)=>s+Number(x.amount||0),0);
+  const expense=items.filter(x=>x.type==="Výdaj").reduce((s,x)=>s+Number(x.amount||0),0);
+  document.getElementById(prefix+"Income").textContent=euro(income);
+  document.getElementById(prefix+"Expense").textContent=euro(expense);
+  document.getElementById(prefix+"Balance").textContent=euro(income-expense);
+  document.getElementById(prefix+"Count").textContent=items.length;
+  const table=document.getElementById(tableId);
+  table.innerHTML=items.length?[...items].reverse().map((f,ri)=>{const i=items.length-1-ri;const del=prefix==="etsFinance"?"deleteEtsFinance":"deleteFarmFinance";const edit=prefix==="etsFinance"?"editEtsFinance":"editFarmFinance";return `<tr><td>${formatDate(f.date)}</td><td>${esc(f.type)}</td><td>${esc(f.category)}</td><td>${esc(f.description||"—")}</td><td>${f.type==="Výdaj"?"−":"+"}${euro(f.amount)}</td><td><button class="action-btn" onclick="${edit}(${i})">✏️</button><button class="action-btn" onclick="${del}(${i})">🗑️</button></td></tr>`}).join(""):`<tr><td colspan="6"><div class="empty">Zatím tu nejsou žádné položky.</div></td></tr>`;
+}
+function renderEtsFinancePage(){renderMoneySection(data.etsFinance,"etsFinance","etsFinanceTable")}
+function renderFarmFinancePage(){renderMoneySection(data.farmFinance,"farmFinance","farmFinanceTable")}
+function renderFarmMachines(){
+  const el=document.getElementById("farmMachinesGrid"); if(!el)return;
+  el.innerHTML=data.farmMachines.length?data.farmMachines.map((m,i)=>`<div class="vehicle-card"><h4>🚜 ${esc(m.brand)} ${esc(m.model)}</h4><p>${esc(m.type||"Stroj")}</p><div class="card-kpis"><div class="card-kpi"><small>Motohodiny</small><strong>${number(m.hours)} h</strong></div><div class="card-kpi"><small>Stav</small><strong>${esc(m.status||"Aktivní")}</strong></div></div><div class="card-actions"><button class="secondary-btn" onclick="editFarmMachine(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmMachine(${i})">Smazat</button></div></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Nemáš přidaný žádný stroj.</div>`;
+}
+function renderFarmFields(){
+  const el=document.getElementById("farmFieldsGrid"); if(!el)return;
+  el.innerHTML=data.farmFields.length?data.farmFields.map((f,i)=>`<div class="project-card"><h4>🌾 Pole ${esc(f.number)}</h4><p>${esc(f.crop||"Bez plodiny")}</p><div class="project-meta"><span class="tag">${esc(f.area||"—")} ha</span><span class="tag">${esc(f.status||"Volné")}</span></div><div class="card-actions"><button class="secondary-btn" onclick="editFarmField(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmField(${i})">Smazat</button></div></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Nemáš přidané žádné pole.</div>`;
+}
+function renderFarmStorage(){
+  const el=document.getElementById("farmStorageGrid"); if(!el)return;
+  el.innerHTML=data.farmStorage.length?data.farmStorage.map((s,i)=>`<div class="project-card"><h4>🏚️ ${esc(s.name)}</h4><p>${esc(s.product||"Prázdný sklad")}</p><div class="project-meta"><span class="tag">${number(s.amount)} l</span><span class="tag">Kapacita ${number(s.capacity)} l</span></div><div class="card-actions"><button class="secondary-btn" onclick="editFarmStorage(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmStorage(${i})">Smazat</button></div></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Nemáš přidaný žádný sklad.</div>`;
+}
+
+function renderFarm(){
+  const tbody=document.getElementById("farmTableBody");
+  tbody.innerHTML=data.farming.length?[...data.farming].reverse().map((x,ri)=>{
+    const i=data.farming.length-1-ri;
+    return `<tr><td>${formatDate(x.date)}</td><td>${esc(x.map)}</td><td><strong>${esc(x.machine)}</strong></td><td>${esc(x.work)}</td><td>${esc(x.field||"—")}</td><td>${number(x.hours)} h</td><td><button class="action-btn" onclick="editFarm(${i})">✏️</button><button class="action-btn" onclick="deleteFarm(${i})">🗑️</button></td></tr>`;
+  }).join(""):`<tr><td colspan="7"><div class="empty">Zatím nemáš žádný Farming záznam.</div></td></tr>`;
+}
+
+function renderFriends(){
+  const friends=data.friends||[];
+  const q=(document.getElementById("friendSearch")?.value||"").trim().toLowerCase();
+  const filter=document.getElementById("friendFilter")?.value||"all";
+  let shown=friends.filter(f=>{
+    const text=[f.name,f.nickname,f.discord,f.steam,f.note].join(" ").toLowerCase();
+    const matchesText=!q||text.includes(q);
+    const matchesFilter=
+      filter==="all"||
+      (filter==="favorite"&&f.favorite)||
+      (filter==="ets"&&f.ets)||
+      (filter==="farm"&&f.farm)||
+      (filter==="discord"&&f.discord);
+    return matchesText&&matchesFilter;
+  });
+
+  document.getElementById("friendsCount").textContent=friends.length;
+  document.getElementById("favoriteFriendsCount").textContent=friends.filter(f=>f.favorite).length;
+  document.getElementById("etsFriendsCount").textContent=friends.filter(f=>f.ets).length;
+  document.getElementById("farmFriendsCount").textContent=friends.filter(f=>f.farm).length;
+  document.getElementById("dashboardFriendsCount").textContent=friends.length;
+
+  document.getElementById("friendsGrid").innerHTML=shown.length?shown.map((f,idx)=>{
+    const i=friends.indexOf(f);
+    return `<div class="friend-card">
+      <div class="friend-card-head">
+        <div class="friend-avatar">${esc((f.name||"?").charAt(0).toUpperCase())}</div>
+        <div><h4>${esc(f.name)}</h4><p>${esc(f.nickname||"")}</p></div>
+        <div class="friend-favorite">${f.favorite?"⭐":"☆"}</div>
+      </div>
+      <div class="friend-links">
+        ${f.discord?`<div>💬 Discord: ${esc(f.discord)}</div>`:""}
+        ${f.steam?`<div>🎮 Steam: ${esc(f.steam)}</div>`:""}
+        ${f.ets?`<div>🚛 ETS 2</div>`:""}
+        ${f.farm?`<div>🚜 Farming</div>`:""}
+        ${f.note?`<div>📝 ${esc(f.note)}</div>`:""}
+      </div>
+      <div class="card-actions">
+        <button class="secondary-btn" onclick="toggleFriendFavorite(${i})">${f.favorite?"Odebrat ⭐":"Přidat ⭐"}</button>
+        <button class="secondary-btn" onclick="editFriend(${i})">Upravit</button>
+        <button class="danger-btn" onclick="deleteFriend(${i})">Smazat</button>
+      </div>
+    </div>`;
+  }).join(""):`<div class="empty" style="grid-column:1/-1">Žádní přátelé neodpovídají filtru.</div>`;
+}
+
+function updateClock(){
+  try{
+    const now=new Date();
+    const fullTime=now.toLocaleTimeString("cs-CZ",{
+      hour:"2-digit",minute:"2-digit",second:"2-digit"
+    });
+    const shortTime=now.toLocaleTimeString("cs-CZ",{
+      hour:"2-digit",minute:"2-digit"
+    });
+    const fullDate=now.toLocaleDateString("cs-CZ",{
+      weekday:"long",day:"numeric",month:"long",year:"numeric"
+    });
+    const shortDate=now.toLocaleDateString("cs-CZ",{
+      day:"2-digit",month:"2-digit",year:"numeric"
+    });
+
+    const dashboardClock=document.getElementById("currentClock");
+    const dashboardDate=document.getElementById("currentDate");
+    const topClock=document.getElementById("topClock");
+    const topDate=document.getElementById("topClockDate");
+
+    if(dashboardClock)dashboardClock.textContent=fullTime;
+    if(dashboardDate)dashboardDate.textContent=fullDate;
+    if(topClock)topClock.textContent=shortTime;
+    if(topDate)topDate.textContent=shortDate;
+  }catch(e){
+    console.error("Clock error:",e);
+  }
+}
+
+function weatherDescription(code){
+  const map={
+    0:["☀️","Jasno"],1:["🌤️","Převážně jasno"],2:["⛅","Polojasno"],3:["☁️","Zataženo"],
+    45:["🌫️","Mlha"],48:["🌫️","Mrznoucí mlha"],
+    51:["🌦️","Slabé mrholení"],53:["🌦️","Mrholení"],55:["🌧️","Silné mrholení"],
+    61:["🌦️","Slabý déšť"],63:["🌧️","Déšť"],65:["🌧️","Silný déšť"],
+    71:["🌨️","Slabé sněžení"],73:["🌨️","Sněžení"],75:["❄️","Silné sněžení"],
+    80:["🌦️","Přeháňky"],81:["🌧️","Přeháňky"],82:["⛈️","Silné přeháňky"],
+    95:["⛈️","Bouřka"],96:["⛈️","Bouřka s kroupami"],99:["⛈️","Silná bouřka"]
+  };
+  return map[code]||["🌦️","Neznámé počasí"];
+}
+
+async function loadWeather(){
+  const city=(data.weatherCity||"Praha").trim();
+  document.getElementById("weatherCityLabel").textContent=city;
+  document.getElementById("weatherText").textContent="Načítám...";
+  try{
+    const r=await fetch("/api/weather?city="+encodeURIComponent(city));
+    if(!r.ok)throw new Error("weather");
+    const w=await r.json();
+    const [icon,text]=weatherDescription(Number(w.weather_code));
+    document.getElementById("weatherIcon").textContent=icon;
+    document.getElementById("weatherTemp").textContent=`${Math.round(Number(w.temperature_2m))} °C`;
+    document.getElementById("weatherText").textContent=`${text} • vítr ${Math.round(Number(w.wind_speed_10m||0))} km/h`;
+    document.getElementById("weatherCityLabel").textContent=w.locationName||city;
+  }catch{
+    document.getElementById("weatherIcon").textContent="⚠️";
+    document.getElementById("weatherTemp").textContent="— °C";
+    document.getElementById("weatherText").textContent="Počasí není dostupné";
+  }
+}
+
+let musicPlaylist=[];
+let musicIndex=-1;
+
+function formatMusicTime(sec){
+  if(!Number.isFinite(sec))return"0:00";
+  const m=Math.floor(sec/60),s=Math.floor(sec%60);
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+function renderMusicPlaylist(){
+  const list=document.getElementById("musicPlaylistList");
+  if(!list)return;
+  list.innerHTML=musicPlaylist.length?musicPlaylist.map((t,i)=>`<div class="music-list-item ${i===musicIndex?"active":""}">
+    <button onclick="playMusicIndex(${i})"><strong>${esc(t.name)}</strong><small>${esc(t.folder||"Lokální hudba")}</small></button>
+    <button class="action-btn" onclick="removeMusicTrack(${i})">🗑️</button>
+  </div>`).join(""):`<div class="empty">Playlist je prázdný.</div>`;
+}
+async function loadSavedMusic(){
+  if(!window.kvaltikDesktop?.getMusicLibrary){
+    console.warn("Music bridge is not available.");
+    return;
+  }
+  try{
+    musicPlaylist=await window.kvaltikDesktop.getMusicLibrary()||[];
+    renderMusicPlaylist();
+    if(musicPlaylist.length&&musicIndex<0)musicIndex=0;
+    if(musicIndex>=musicPlaylist.length)musicIndex=musicPlaylist.length-1;
+    updateMusicLabels();
+  }catch(e){
+    console.error("Music library load error:",e);
+    toast("Playlist se nepodařilo načíst.");
+  }
+}
+function updateMusicLabels(){
+  const t=musicPlaylist[musicIndex];
+  const title=t?.name||"Žádná skladba";
+  const meta=t?.folder||"Klikni na „Přidat hudbu“";
+  document.getElementById("musicTrackTitle").textContent=title;
+  document.getElementById("musicTrackMeta").textContent=meta;
+  document.getElementById("dashboardTrackName").textContent=t?.name||"Nic nehraje";
+  document.getElementById("dashboardTrackArtist").textContent=t?.folder||"Vyber skladby dole";
+}
+window.playMusicIndex=async i=>{
+  if(i<0||i>=musicPlaylist.length)return;
+  musicIndex=i;
+
+  const track=musicPlaylist[i];
+  const audio=document.getElementById("musicAudio");
+  if(!audio||!track?.url)return;
+
+  try{
+    audio.pause();
+    audio.src=track.url;
+    audio.load();
+
+    updateMusicLabels();
+    renderMusicPlaylist();
+
+    await audio.play();
+  }catch(e){
+    console.error("Music playback error:",e);
+    document.getElementById("musicPlayBtn").textContent="▶";
+    toast("Skladbu se nepodařilo přehrát. Zkus MP3, WAV, M4A, AAC, OGG nebo FLAC.");
+  }
+};
+window.removeMusicTrack=async i=>{
+  if(!window.kvaltikDesktop?.removeMusicTrack)return;
+  await window.kvaltikDesktop.removeMusicTrack(musicPlaylist[i]?.id);
+  if(i===musicIndex){document.getElementById("musicAudio").pause();musicIndex=-1}
+  await loadSavedMusic();
+};
+
+function renderGallery(){
+  document.getElementById("galleryGrid").innerHTML=data.gallery.length?data.gallery.map((img,i)=>`<div class="gallery-item"><img src="${img.data}" alt="${esc(img.name)}"><button onclick="deleteImage(${i})">🗑️</button></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Nahraj první obrázek.</div>`;
+}
+function renderAbout(){
+  document.getElementById("aboutName").value=data.about.name||"";
+  document.getElementById("aboutMotto").value=data.about.motto||"";
+  document.getElementById("aboutBio").value=data.about.bio||"";
+  document.getElementById("profileDisplayName").textContent=data.about.name||"Kvaltík";
+  document.getElementById("profileDisplayBio").textContent=data.about.bio||"";
+  const avatar=document.getElementById("profileAvatar"), hero=document.getElementById("heroBadge");
+  if(data.about.profileImage){
+    avatar.style.backgroundImage=`url("${data.about.profileImage}")`;avatar.textContent="";
+    hero.style.backgroundImage=`url("${data.about.profileImage}")`;hero.textContent="";
+  }else{
+    avatar.style.backgroundImage="";hero.style.backgroundImage="";
+    const l=(data.about.name||"K").charAt(0).toUpperCase();avatar.textContent=l;hero.textContent=l;
+  }
+}
+function renderSocials(){
+  ["youtube","instagram","twitch","tiktok","web"].forEach(k=>document.getElementById("social"+k.charAt(0).toUpperCase()+k.slice(1)).value=data.socials[k]||"");
+  const names={youtube:"YouTube",instagram:"Instagram",twitch:"Twitch",tiktok:"TikTok",web:"Web"};
+  const icons={youtube:"▶️",instagram:"📸",twitch:"🟣",tiktok:"🎵",web:"🌍"};
+  const items=Object.entries(data.socials).filter(([,v])=>v);
+  document.getElementById("socialCards").innerHTML=items.length?items.map(([k,v])=>`<div class="social-card"><h4>${icons[k]} ${names[k]}</h4><a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Vyplň odkazy nahoře a ulož je.</div>`;
+}
+
+async function loadDiscordServerInfo(){
+  const liveName=document.getElementById("discordLiveName");
+  if(!liveName)return;
+  let info=null;
+  if(discordAuthAvailable()){
+    try{
+      const r=await fetch("/api/discord-server");
+      if(r.ok)info=await r.json();
+    }catch{}
+  }
+
+  const fallbackName=data.discord.name||"Kvaltík Community";
+  const fallbackDescription=data.discord.description||"Komunita kolem Kvaltík Hubu.";
+  const fallbackInvite=data.discord.invite||"";
+
+  document.getElementById("discordLiveName").textContent=info?.name||fallbackName;
+  document.getElementById("discordLiveDescription").textContent=info?.description||fallbackDescription;
+  document.getElementById("discordOnlineCount").textContent=info?.presence_count??"—";
+  document.getElementById("discordChannelCount").textContent=Array.isArray(info?.channels)?info.channels.length:"—";
+  document.getElementById("discordWidgetStatus").textContent=info?.widgetAvailable?"Online":"Nedostupný";
+
+  const invite=info?.instant_invite||info?.inviteUrl||fallbackInvite;
+  ["discordLiveInvite","discordJoinTop"].forEach(id=>{
+    const a=document.getElementById(id);
+    if(invite){a.href=invite;a.classList.remove("disabled")}
+    else{a.href="#";a.classList.add("disabled")}
+  });
+
+  const logo=document.getElementById("discordServerIcon");
+  if(info?.icon_url){
+    logo.style.backgroundImage=`url("${info.icon_url}")`;logo.textContent="";
+  }else{
+    logo.style.backgroundImage="";logo.textContent="💬";
+  }
+
+  document.getElementById("discordServerHint").textContent=
+    info?.widgetAvailable
+      ?"Živé údaje jsou načtené přímo z Discord Server Widgetu."
+      :"Živé údaje nejsou dostupné. Zobrazuji uložené informace; zkontroluj ID serveru a povolení Server Widgetu.";
+}
+
+
+function renderDiscord(){
+  loadDesktopDiscordConfig();
+  document.getElementById("discordName").value=data.discord.name||"";
+  document.getElementById("discordInvite").value=data.discord.invite||"";
+  document.getElementById("discordDescription").value=data.discord.description||"";
+  loadDiscordServerInfo();
+}
+function renderProjects(){
+  document.getElementById("projectsGrid").innerHTML=data.projects.length?[...data.projects].reverse().map((x,ri)=>{const i=data.projects.length-1-ri;return `<div class="project-card"><h4>${esc(x.name)}</h4><p>${esc(x.description||"Bez popisu")}</p><div class="project-meta"><span class="tag">${esc(x.type)}</span><span class="tag">${esc(x.status)}</span></div><div class="card-actions"><button class="secondary-btn" onclick="editProject(${i})">Upravit</button><button class="danger-btn" onclick="deleteProject(${i})">Smazat</button></div></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Zatím tu nemáš žádný projekt.</div>`;
+}
+function renderNotes(){
+  document.getElementById("notesGrid").innerHTML=data.notes.length?[...data.notes].reverse().map((x,ri)=>{const i=data.notes.length-1-ri;return `<div class="note-card"><h4>${esc(x.title)}</h4><p>${esc(x.text)}</p><div class="project-meta"><span class="tag">${formatDate(x.date)}</span></div><div class="card-actions"><button class="secondary-btn" onclick="editNote(${i})">Upravit</button><button class="danger-btn" onclick="deleteNote(${i})">Smazat</button></div></div>`}).join(""):`<div class="empty" style="grid-column:1/-1">Zatím tu nemáš žádnou poznámku.</div>`;
+}
+function applyTheme(){document.body.classList.toggle("light",data.theme==="light");document.getElementById("themeBtn").textContent=data.theme==="light"?"☀️":"🌙"}
+function renderWeatherSettings(){const el=document.getElementById("weatherCityInput");if(el)el.value=data.weatherCity||"Praha"}
+function renderAll(){
+  const renderers=[renderDashboard,renderEts,renderCompany,renderEtsFleetPage,renderEtsFinancePage,renderFarm,renderFarmMachines,renderFarmFields,renderFarmStorage,renderFarmFinancePage,renderFriends,renderGallery,renderAbout,renderSocials,renderDiscord,renderProjects,renderNotes,renderWeatherSettings,applyTheme];
+  renderers.forEach(fn=>{try{fn()}catch(err){console.error("Render error:",fn.name,err)}});
+}
+
+const modal=document.getElementById("modal"),modalForm=document.getElementById("modalForm");
+function openModal(title,fields,onSubmit,values={}){
+  document.getElementById("modalTitle").textContent=title;
+  modalForm.innerHTML=fields.map(f=>{
+    const val=values[f.name]??"";
+    if(f.type==="textarea")return `<label class="${f.full?'full':''}">${f.label}<textarea name="${f.name}" rows="${f.rows||4}" ${f.required?'required':''}>${esc(val)}</textarea></label>`;
+    if(f.type==="select")return `<label class="${f.full?'full':''}">${f.label}<select name="${f.name}">${f.options.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join("")}</select></label>`;
+    return `<label class="${f.full?'full':''}">${f.label}<input type="${f.type||'text'}" name="${f.name}" value="${esc(val)}" ${f.required?'required':''} ${f.step?`step="${f.step}"`:''}></label>`;
+  }).join("")+`<div class="full" style="display:flex;justify-content:flex-end;gap:10px"><button type="button" class="secondary-btn" id="cancelModal">Zrušit</button><button class="primary-btn">Uložit</button></div>`;
+  modal.classList.add("open");
+  document.getElementById("cancelModal").onclick=closeModal;
+  modalForm.onsubmit=e=>{e.preventDefault();onSubmit(Object.fromEntries(new FormData(modalForm).entries()));closeModal()}
+}
+function closeModal(){modal.classList.remove("open")}
+document.getElementById("modalClose").onclick=closeModal;modal.onclick=e=>{if(e.target===modal)closeModal()};
+
+function buildEtsFields(){
+  const companyOptions=["Soukromá jízda"];
+  if(data.company)companyOptions.push(data.company.name);
+  const driverOptions=["— Nevybrán —",...data.drivers.map(d=>d.name)];
+  return [
+    {name:"date",label:"Datum",type:"date",required:true},{name:"truck",label:"Tahač / vozidlo",required:true},
+    {name:"from",label:"Odkud",required:true},{name:"to",label:"Kam",required:true},{name:"cargo",label:"Náklad",required:true},
+    {name:"km",label:"Kilometry",type:"number",step:"0.1",required:true},{name:"income",label:"Výdělek (€)",type:"number"},
+    {name:"companyChoice",label:"Jízda pro",type:"select",options:companyOptions},
+    {name:"driverChoice",label:"Řidič",type:"select",options:driverOptions},
+    {name:"note",label:"Poznámka",type:"textarea",full:true}
+  ];
+}
+function normalizeEtsForm(o){
+  const copy={...o};
+  if(data.company&&o.companyChoice===data.company.name){
+    copy.companyId=data.company.id;copy.company=data.company.name;
+  }else{copy.companyId="";copy.company=""}
+  const drv=data.drivers.find(d=>d.name===o.driverChoice);
+  copy.driverId=drv?drv.id:"";
+  delete copy.companyChoice;delete copy.driverChoice;
+  return copy;
+}
+function etsValuesForEdit(x){
+  return {...x,companyChoice:(x.companyId&&data.company&&x.companyId===data.company.id)?data.company.name:"Soukromá jízda",driverChoice:(data.drivers.find(d=>d.id===x.driverId)||{}).name||"— Nevybrán —"};
+}
+document.getElementById("addEtsBtn").onclick=()=>openModal("Přidat ETS 2 jízdu",buildEtsFields(),o=>{data.ets2.push(normalizeEtsForm(o));saveData("ETS 2 jízda byla uložena.")},{date:new Date().toISOString().slice(0,10),companyChoice:data.company?data.company.name:"Soukromá jízda"});
+window.editEts=i=>openModal("Upravit ETS 2 jízdu",buildEtsFields(),o=>{data.ets2[i]=normalizeEtsForm(o);saveData("Jízda byla upravena.")},etsValuesForEdit(data.ets2[i]));
+window.deleteEts=i=>{if(confirm("Smazat jízdu?")){data.ets2.splice(i,1);saveData("Jízda byla smazána.")}};
+
+
+const companyFields=[
+  {name:"name",label:"Název firmy",required:true,full:true},
+  {name:"hq",label:"Sídlo firmy",required:true},
+  {name:"founded",label:"Datum založení",type:"date"},
+  {name:"description",label:"Popis firmy",type:"textarea",full:true}
+];
+function createCompany(){
+  openModal("Založit virtuální firmu",companyFields,o=>{
+    data.company={id:"company_"+Date.now(),...o,logo:""};
+    saveData("Virtuální firma byla založena.");
+  },{name:"Kvaltík Transport",founded:new Date().toISOString().slice(0,10)});
+}
+document.getElementById("addCompanyBtn").onclick=createCompany;
+document.getElementById("addCompanyBtn2").onclick=createCompany;
+document.getElementById("editCompanyBtn").onclick=()=>{if(!data.company)return;openModal("Upravit virtuální firmu",companyFields,o=>{data.company={...data.company,...o};saveData("Firma byla upravena.")},data.company)};
+document.getElementById("deleteCompanyBtn").onclick=()=>{if(!data.company)return;if(confirm("Opravdu smazat virtuální firmu? Firemní jízdy zůstanou v knize jízd, ale přestanou být propojené s firmou.")){data.company=null;data.drivers=[];data.fleet=[];data.finance=[];saveData("Virtuální firma byla smazána.")}};
+
+const driverFields=[
+  {name:"name",label:"Jméno řidiče",required:true,full:true},
+  {name:"role",label:"Pozice",type:"select",options:["Majitel","Řidič","Dispečer","Manažer"]},
+  {name:"joined",label:"Datum nástupu",type:"date"},
+  {name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+document.getElementById("addDriverBtn").onclick=()=>openModal("Přidat řidiče",driverFields,o=>{data.drivers.push({id:"driver_"+Date.now(),...o});saveData("Řidič byl přidán.")},{role:"Řidič",joined:new Date().toISOString().slice(0,10)});
+window.editDriver=i=>openModal("Upravit řidiče",driverFields,o=>{data.drivers[i]={...data.drivers[i],...o};saveData("Řidič byl upraven.")},data.drivers[i]);
+window.deleteDriver=i=>{if(confirm("Smazat tohoto řidiče?")){data.drivers.splice(i,1);saveData("Řidič byl smazán.")}};
+
+const vehicleFields=[
+  {name:"brand",label:"Značka",required:true},{name:"model",label:"Model",required:true},
+  {name:"type",label:"Typ",type:"select",options:["Tahač","Nákladní auto","Dodávka","Jiné"]},
+  {name:"plate",label:"SPZ"},{name:"odometer",label:"Stav km",type:"number",step:"0.1"},
+  {name:"power",label:"Výkon",placeholder:"např. 770 hp"},
+  {name:"status",label:"Stav",type:"select",options:["Aktivní","V servisu","Odstavené","Prodáno"]},
+  {name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+document.getElementById("addVehicleBtn").onclick=()=>openModal("Přidat vozidlo",vehicleFields,o=>{data.fleet.push({id:"vehicle_"+Date.now(),...o});saveData("Vozidlo bylo přidáno.")},{type:"Tahač",status:"Aktivní"});
+window.editVehicle=i=>openModal("Upravit vozidlo",vehicleFields,o=>{data.fleet[i]={...data.fleet[i],...o};saveData("Vozidlo bylo upraveno.")},data.fleet[i]);
+window.deleteVehicle=i=>{if(confirm("Smazat toto vozidlo?")){data.fleet.splice(i,1);saveData("Vozidlo bylo smazáno.")}};
+
+const financeFields=[
+  {name:"date",label:"Datum",type:"date",required:true},
+  {name:"type",label:"Typ",type:"select",options:["Výdaj","Příjem"]},
+  {name:"category",label:"Kategorie",type:"select",options:["Palivo","Servis","Pokuta","Nákup vozidla","Prodej vozidla","Mzdy","Garáž","Jiné"]},
+  {name:"amount",label:"Částka (€)",type:"number",step:"0.01",required:true},
+  {name:"description",label:"Popis",type:"textarea",full:true}
+];
+document.getElementById("addFinanceBtn").onclick=()=>openModal("Přidat finanční položku",financeFields,o=>{data.finance.push({id:"finance_"+Date.now(),...o});saveData("Finanční položka byla přidána.")},{date:new Date().toISOString().slice(0,10),type:"Výdaj",category:"Palivo"});
+window.editFinance=i=>openModal("Upravit finanční položku",financeFields,o=>{data.finance[i]={...data.finance[i],...o};saveData("Položka byla upravena.")},data.finance[i]);
+window.deleteFinance=i=>{if(confirm("Smazat tuto finanční položku?")){data.finance.splice(i,1);saveData("Položka byla smazána.")}};
+
+document.querySelectorAll(".company-tab").forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll(".company-tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".company-tab-panel").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("company-tab-"+btn.dataset.companyTab).classList.add("active");
+});
+
+
+document.getElementById("addEtsVehicleBtn").onclick=()=>document.getElementById("addVehicleBtn").click();
+
+const moneyFields=[
+  {name:"date",label:"Datum",type:"date",required:true},
+  {name:"type",label:"Typ",type:"select",options:["Příjem","Výdaj"]},
+  {name:"category",label:"Kategorie",type:"select",options:["Zakázka","Palivo","Servis","Pokuta","Nákup","Prodej","Mzdy","Jiné"]},
+  {name:"amount",label:"Částka (€)",type:"number",step:"0.01",required:true},
+  {name:"description",label:"Popis",type:"textarea",full:true}
+];
+document.getElementById("addEtsFinanceBtn").onclick=()=>openModal("ETS 2 – finanční položka",moneyFields,o=>{data.etsFinance.push({id:"etsf_"+Date.now(),...o});saveData("ETS 2 finanční položka byla přidána.")},{date:new Date().toISOString().slice(0,10),type:"Výdaj",category:"Palivo"});
+window.editEtsFinance=i=>openModal("Upravit ETS 2 finance",moneyFields,o=>{data.etsFinance[i]={...data.etsFinance[i],...o};saveData("Položka byla upravena.")},data.etsFinance[i]);
+window.deleteEtsFinance=i=>{if(confirm("Smazat položku?")){data.etsFinance.splice(i,1);saveData("Položka byla smazána.")}};
+
+document.getElementById("addFarmFinanceBtn").onclick=()=>openModal("Farming – finanční položka",moneyFields,o=>{data.farmFinance.push({id:"farmf_"+Date.now(),...o});saveData("Farming finanční položka byla přidána.")},{date:new Date().toISOString().slice(0,10),type:"Výdaj",category:"Palivo"});
+window.editFarmFinance=i=>openModal("Upravit Farming finance",moneyFields,o=>{data.farmFinance[i]={...data.farmFinance[i],...o};saveData("Položka byla upravena.")},data.farmFinance[i]);
+window.deleteFarmFinance=i=>{if(confirm("Smazat položku?")){data.farmFinance.splice(i,1);saveData("Položka byla smazána.")}};
+
+const machineFields=[
+  {name:"brand",label:"Značka",required:true},{name:"model",label:"Model",required:true},
+  {name:"type",label:"Typ",type:"select",options:["Traktor","Kombajn","Řezačka","Nakladač","Přívěs","Jiné"]},
+  {name:"hours",label:"Motohodiny",type:"number",step:"0.1"},
+  {name:"status",label:"Stav",type:"select",options:["Aktivní","V servisu","Odstavený","Prodán"]},
+  {name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+document.getElementById("addFarmMachineBtn").onclick=()=>openModal("Přidat Farming stroj",machineFields,o=>{data.farmMachines.push({id:"machine_"+Date.now(),...o});saveData("Stroj byl přidán.")},{type:"Traktor",status:"Aktivní"});
+window.editFarmMachine=i=>openModal("Upravit stroj",machineFields,o=>{data.farmMachines[i]={...data.farmMachines[i],...o};saveData("Stroj byl upraven.")},data.farmMachines[i]);
+window.deleteFarmMachine=i=>{if(confirm("Smazat stroj?")){data.farmMachines.splice(i,1);saveData("Stroj byl smazán.")}};
+
+const fieldFields=[
+  {name:"number",label:"Číslo / název pole",required:true},
+  {name:"area",label:"Rozloha (ha)",type:"number",step:"0.01"},
+  {name:"crop",label:"Plodina"},
+  {name:"status",label:"Stav",type:"select",options:["Volné","Zaseto","Roste","Připraveno ke sklizni","Sklizeno"]},
+  {name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+document.getElementById("addFarmFieldBtn").onclick=()=>openModal("Přidat pole",fieldFields,o=>{data.farmFields.push({id:"field_"+Date.now(),...o});saveData("Pole bylo přidáno.")},{status:"Volné"});
+window.editFarmField=i=>openModal("Upravit pole",fieldFields,o=>{data.farmFields[i]={...data.farmFields[i],...o};saveData("Pole bylo upraveno.")},data.farmFields[i]);
+window.deleteFarmField=i=>{if(confirm("Smazat pole?")){data.farmFields.splice(i,1);saveData("Pole bylo smazáno.")}};
+
+const storageFields=[
+  {name:"name",label:"Název skladu",required:true},{name:"product",label:"Komodita"},
+  {name:"amount",label:"Množství (l)",type:"number",step:"1"},
+  {name:"capacity",label:"Kapacita (l)",type:"number",step:"1"},
+  {name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+document.getElementById("addFarmStorageBtn").onclick=()=>openModal("Přidat sklad",storageFields,o=>{data.farmStorage.push({id:"storage_"+Date.now(),...o});saveData("Sklad byl přidán.")});
+window.editFarmStorage=i=>openModal("Upravit sklad",storageFields,o=>{data.farmStorage[i]={...data.farmStorage[i],...o};saveData("Sklad byl upraven.")},data.farmStorage[i]);
+window.deleteFarmStorage=i=>{if(confirm("Smazat sklad?")){data.farmStorage.splice(i,1);saveData("Sklad byl smazán.")}};
+
+const farmFields=[
+  {name:"date",label:"Datum",type:"date",required:true},{name:"map",label:"Mapa / farma",required:true},{name:"machine",label:"Stroj",required:true},
+  {name:"work",label:"Práce",required:true},{name:"field",label:"Pole"},{name:"hours",label:"Motohodiny",type:"number",step:"0.1"},
+  {name:"income",label:"Výdělek (€)",type:"number"},{name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+document.getElementById("addFarmBtn").onclick=()=>openModal("Přidat Farming záznam",farmFields,o=>{data.farming.push(o);saveData("Farming záznam byl uložen.")},{date:new Date().toISOString().slice(0,10)});
+window.editFarm=i=>openModal("Upravit Farming záznam",farmFields,o=>{data.farming[i]=o;saveData("Záznam byl upraven.")},data.farming[i]);
+window.deleteFarm=i=>{if(confirm("Smazat záznam?")){data.farming.splice(i,1);saveData("Záznam byl smazán.")}};
+
+
+const friendFields=[
+  {name:"name",label:"Jméno",required:true},
+  {name:"nickname",label:"Přezdívka"},
+  {name:"discord",label:"Discord"},
+  {name:"steam",label:"Steam"},
+  {name:"ets",label:"Hraje ETS 2",type:"select",options:["Ano","Ne"]},
+  {name:"farm",label:"Hraje Farming",type:"select",options:["Ano","Ne"]},
+  {name:"favorite",label:"Oblíbený",type:"select",options:["Ne","Ano"]},
+  {name:"note",label:"Poznámka",type:"textarea",full:true}
+];
+function normalizeFriend(o){
+  return {...o,ets:o.ets==="Ano",farm:o.farm==="Ano",favorite:o.favorite==="Ano"};
+}
+function friendEditValues(f){
+  return {...f,ets:f.ets?"Ano":"Ne",farm:f.farm?"Ano":"Ne",favorite:f.favorite?"Ano":"Ne"};
+}
+document.getElementById("addFriendBtn").onclick=()=>openModal("Přidat přítele",friendFields,o=>{data.friends.push({id:"friend_"+Date.now(),...normalizeFriend(o)});saveData("Přítel byl přidán.")},{ets:"Ano",farm:"Ne",favorite:"Ne"});
+window.editFriend=i=>openModal("Upravit přítele",friendFields,o=>{data.friends[i]={...data.friends[i],...normalizeFriend(o)};saveData("Přítel byl upraven.")},friendEditValues(data.friends[i]));
+window.deleteFriend=i=>{if(confirm("Smazat tohoto přítele?")){data.friends.splice(i,1);saveData("Přítel byl smazán.")}};
+window.toggleFriendFavorite=i=>{data.friends[i].favorite=!data.friends[i].favorite;saveData()};
+document.getElementById("friendSearch").oninput=renderFriends;
+document.getElementById("friendFilter").onchange=renderFriends;
+
+const projectFields=[
+  {name:"name",label:"Název projektu",required:true,full:true},{name:"type",label:"Typ",type:"select",options:["Aplikace","Web","YouTube","Farming","ETS 2","Doprava","Jiné"]},
+  {name:"status",label:"Stav",type:"select",options:["Nápad","Plánování","Rozpracováno","Pozastaveno","Hotovo"]},{name:"description",label:"Popis",type:"textarea",full:true}
+];
+document.getElementById("addProjectBtn").onclick=()=>openModal("Nový projekt",projectFields,o=>{data.projects.push(o);saveData("Projekt byl vytvořen.")},{type:"Aplikace",status:"Nápad"});
+window.editProject=i=>openModal("Upravit projekt",projectFields,o=>{data.projects[i]=o;saveData("Projekt byl upraven.")},data.projects[i]);
+window.deleteProject=i=>{if(confirm("Smazat projekt?")){data.projects.splice(i,1);saveData("Projekt byl smazán.")}};
+
+const noteFields=[{name:"title",label:"Název",required:true,full:true},{name:"text",label:"Text poznámky",type:"textarea",required:true,full:true,rows:7},{name:"date",label:"Datum",type:"date",full:true}];
+document.getElementById("addNoteBtn").onclick=()=>openModal("Nová poznámka",noteFields,o=>{data.notes.push(o);saveData("Poznámka byla uložena.")},{date:new Date().toISOString().slice(0,10)});
+window.editNote=i=>openModal("Upravit poznámku",noteFields,o=>{data.notes[i]=o;saveData("Poznámka byla upravena.")},data.notes[i]);
+window.deleteNote=i=>{if(confirm("Smazat poznámku?")){data.notes.splice(i,1);saveData("Poznámka byla smazána.")}};
+
+document.getElementById("aboutForm").onsubmit=e=>{
+  e.preventDefault();
+  data.about.name=document.getElementById("aboutName").value.trim();
+  data.about.motto=document.getElementById("aboutMotto").value.trim();
+  data.about.bio=document.getElementById("aboutBio").value.trim();
+  saveData("Profil byl uložen.");
+};
+document.getElementById("profileImageInput").onchange=e=>{
+  const file=e.target.files[0];if(!file)return;
+  if(file.size>2*1024*1024){toast("Profilový obrázek musí mít méně než 2 MB.");return}
+  const r=new FileReader();r.onload=()=>{data.about.profileImage=r.result;saveData("Profilový obrázek byl uložen.")};r.readAsDataURL(file);
+};
+document.getElementById("imageInput").onchange=e=>{
+  const files=[...e.target.files].slice(0,12);
+  let left=files.length;if(!left)return;
+  files.forEach(file=>{
+    if(!file.type.startsWith("image/")){if(--left===0)saveData();return}
+    if(file.size>3*1024*1024){toast(`${file.name}: max 3 MB`);if(--left===0)saveData();return}
+    const r=new FileReader();r.onload=()=>{data.gallery.push({name:file.name,data:r.result});if(--left===0)saveData("Obrázky byly nahrány.")};r.readAsDataURL(file);
+  });
+  e.target.value="";
+};
+window.deleteImage=i=>{if(confirm("Smazat obrázek?")){data.gallery.splice(i,1);saveData("Obrázek byl smazán.")}};
+
+document.getElementById("socialForm").onsubmit=e=>{
+  e.preventDefault();["youtube","instagram","twitch","tiktok","web"].forEach(k=>data.socials[k]=document.getElementById("social"+k.charAt(0).toUpperCase()+k.slice(1)).value.trim());saveData("Sociální sítě byly uloženy.");
+};
+document.getElementById("discordForm").onsubmit=async e=>{
+  e.preventDefault();
+  data.discord={
+    name:document.getElementById("discordName").value.trim(),
+    invite:document.getElementById("discordInvite").value.trim(),
+    description:document.getElementById("discordDescription").value.trim()
+  };
+  if(window.kvaltikDesktop?.saveDiscordConfig){
+    const result=await window.kvaltikDesktop.saveDiscordConfig({
+      guildId:document.getElementById("discordGuildId").value.trim(),
+      inviteUrl:data.discord.invite,
+      serverName:data.discord.name,
+      serverDescription:data.discord.description
+    });
+    if(!result?.ok){
+      toast(result?.error||"Discord konfiguraci se nepodařilo uložit.");
+      return;
+    }
+  }
+  saveData("Discord nastavení bylo uloženo.");
+};
+document.getElementById("refreshDiscordInfoBtn").onclick=async()=>{await loadDiscordServerInfo();toast("Discord informace byly obnoveny.")};
+
+
+
+document.getElementById("weatherRefreshBtn").onclick=loadWeather;
+document.getElementById("saveWeatherCityBtn").onclick=()=>{
+  data.weatherCity=document.getElementById("weatherCityInput").value.trim()||"Praha";
+  saveData("Město pro počasí bylo uloženo.");
+  loadWeather();
+};
+document.getElementById("addMusicBtn").onclick=async()=>{
+  if(!window.kvaltikDesktop?.addMusicFiles){
+    toast("Přidávání hudby je dostupné v desktopové verzi.");
+    return;
+  }
+  const result=await window.kvaltikDesktop.addMusicFiles();
+  if(result?.ok){
+    await loadSavedMusic();
+    if(musicPlaylist.length&&musicIndex<0)musicIndex=0;
+    toast(result.added?`Přidáno skladeb: ${result.added}`:"Nebyla vybrána žádná hudba.");
+  }
+};
+document.getElementById("musicPlaylistBtn").onclick=()=>document.getElementById("musicPlaylistDrawer").classList.toggle("open");
+document.getElementById("closePlaylistBtn").onclick=()=>document.getElementById("musicPlaylistDrawer").classList.remove("open");
+document.getElementById("musicPrevBtn").onclick=()=>{
+  if(!musicPlaylist.length)return;
+  playMusicIndex((musicIndex-1+musicPlaylist.length)%musicPlaylist.length);
+};
+document.getElementById("musicNextBtn").onclick=()=>{
+  if(!musicPlaylist.length)return;
+  playMusicIndex((musicIndex+1)%musicPlaylist.length);
+};
+document.getElementById("musicPlayBtn").onclick=async()=>{
+  const audio=document.getElementById("musicAudio");
+  if(!musicPlaylist.length)return;
+  if(musicIndex<0)musicIndex=0;
+  if(!audio.src){playMusicIndex(musicIndex);return}
+  if(audio.paused){try{await audio.play()}catch{};document.getElementById("musicPlayBtn").textContent="⏸"}
+  else{audio.pause();document.getElementById("musicPlayBtn").textContent="▶"}
+};
+document.getElementById("musicVolume").oninput=e=>{
+  const value=Math.max(0,Math.min(100,Number(e.target.value)||0));
+  document.getElementById("musicAudio").volume=value/100;
+  try{hubStorage.setItem("kvaltikHubMusicVolume",String(value))}catch{}
+};
+document.getElementById("musicProgress").oninput=e=>{
+  const a=document.getElementById("musicAudio");
+  if(Number.isFinite(a.duration))a.currentTime=(Number(e.target.value)/100)*a.duration;
+};
+document.getElementById("musicAudio").ontimeupdate=e=>{
+  const a=e.target;
+  document.getElementById("musicCurrentTime").textContent=formatMusicTime(a.currentTime);
+  document.getElementById("musicDuration").textContent=formatMusicTime(a.duration);
+  if(Number.isFinite(a.duration)&&a.duration>0)document.getElementById("musicProgress").value=(a.currentTime/a.duration)*100;
+};
+document.getElementById("musicAudio").onended=()=>document.getElementById("musicNextBtn").click();
+document.getElementById("musicAudio").onplay=()=>document.getElementById("musicPlayBtn").textContent="⏸";
+document.getElementById("musicAudio").onpause=()=>document.getElementById("musicPlayBtn").textContent="▶";
+document.getElementById("musicAudio").onloadedmetadata=e=>{
+  document.getElementById("musicDuration").textContent=formatMusicTime(e.target.duration);
+};
+document.getElementById("musicAudio").onerror=e=>{
+  const code=e.target?.error?.code;
+  console.error("Audio element error:",code,e.target?.error);
+  document.getElementById("musicPlayBtn").textContent="▶";
+  if(e.target?.src)toast("Chyba při načítání hudebního souboru.");
+};
+
+
+document.getElementById("checkUpdatesBtn").onclick=()=>checkForUpdates(true);
+document.getElementById("downloadUpdateBtn").onclick=async()=>{
+  const result=await window.kvaltikDesktop?.downloadUpdate?.();
+  if(result&&!result.ok)toast(result.error||"Aktualizaci se nepodařilo stáhnout.");
+};
+document.getElementById("installUpdateBtn").onclick=async()=>{
+  if(!confirm("Kvaltík Hub se zavře, nainstaluje novou verzi a znovu spustí. Pokračovat?"))return;
+  await window.kvaltikDesktop?.installUpdate?.();
+};
+document.getElementById("autoCheckUpdatesToggle").onchange=saveUpdatePreferences;
+document.getElementById("autoDownloadUpdatesToggle").onchange=saveUpdatePreferences;
+
+if(window.kvaltikDesktop?.onUpdateStatus){
+  window.kvaltikDesktop.onUpdateStatus(state=>renderUpdateState(state));
+}
+
+document.getElementById("themeBtn").onclick=()=>{data.theme=data.theme==="dark"?"light":"dark";saveData()};
+document.getElementById("menuBtn").onclick=()=>document.getElementById("sidebar").classList.toggle("open");
+
+document.getElementById("exportBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=`kvaltik-hub-${currentUser.username}-zaloha.json`;a.click();URL.revokeObjectURL(a.href);toast("Záloha byla vytvořena.");
+};
+document.getElementById("importInput").onchange=e=>{
+  const file=e.target.files[0];if(!file)return;const r=new FileReader();
+  r.onload=()=>{try{data={...structuredClone(defaultUserData),...JSON.parse(r.result)};saveData("Záloha byla obnovena.")}catch{alert("Neplatná záloha.")}};r.readAsText(file)
+};
+document.getElementById("clearBtn").onclick=()=>{if(confirm("Opravdu vymazat data tohoto účtu?")){data=structuredClone(defaultUserData);saveData("Data byla vymazána.")}};
+
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.remove("show"),2200)}
+
+
+document.querySelectorAll(".settings-tab").forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll(".settings-tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".settings-panel").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("settings-tab-"+btn.dataset.settingsTab)?.classList.add("active");
+});
+
+
+
+function initClockAndMusic(){
+  updateClock();
+  setInterval(updateClock,1000);
+
+  const audio=document.getElementById("musicAudio");
+  const volume=document.getElementById("musicVolume");
+  const savedVolume=Number(hubStorage.getItem("kvaltikHubMusicVolume")||75);
+  const safeVolume=Number.isFinite(savedVolume)?Math.max(0,Math.min(100,savedVolume)):75;
+  if(volume)volume.value=String(safeVolume);
+  if(audio)audio.volume=safeVolume/100;
+
+  setTimeout(()=>loadSavedMusic(),250);
+  setTimeout(()=>loadWeather(),600);
+}
+
+initClockAndMusic();
+
+
+let updateUiInitialized=false;
+let updateLastState=null;
+
+function humanBytes(bytes){
+  const n=Number(bytes||0);
+  if(!Number.isFinite(n)||n<=0)return"0 MB";
+  if(n<1024*1024)return`${(n/1024).toFixed(1)} KB`;
+  return`${(n/1024/1024).toFixed(1)} MB`;
+}
+function setUpdatePill(text,type=""){
+  const pill=document.getElementById("updateStatusPill");
+  if(!pill)return;
+  pill.textContent=text;
+  pill.className="update-status-pill"+(type?` ${type}`:"");
+}
+function renderUpdateState(state){
+  if(!state)return;
+  updateLastState=state;
+
+  const current=document.getElementById("updateCurrentVersion");
+  const latest=document.getElementById("updateLatestVersion");
+  const status=document.getElementById("updateStatusText");
+  const checkBtn=document.getElementById("checkUpdatesBtn");
+  const downloadBtn=document.getElementById("downloadUpdateBtn");
+  const installBtn=document.getElementById("installUpdateBtn");
+  const progressWrap=document.getElementById("updateProgressWrap");
+  const progressFill=document.getElementById("updateProgressFill");
+  const progressPercent=document.getElementById("updateProgressPercent");
+  const progressDetail=document.getElementById("updateProgressDetail");
+  const notesBox=document.getElementById("updateReleaseNotes");
+  const notesText=document.getElementById("updateReleaseNotesText");
+  const configText=document.getElementById("updateConfigText");
+
+  if(current)current.textContent=state.currentVersion||"—";
+  if(latest)latest.textContent=state.availableVersion||state.currentVersion||"—";
+  if(status)status.textContent=state.message||"—";
+
+  if(configText){
+    if(!state.supported)configText.textContent=state.reason||"Automatické aktualizace nejsou v této verzi dostupné.";
+    else if(!state.configured)configText.textContent="Aktualizace zatím nejsou propojené s GitHub repozitářem. Nejdřív spusť NASTAVIT_AKTUALIZACE.cmd a vytvoř nový instalátor.";
+    else configText.textContent="GitHub Releases jsou nakonfigurované a připravené.";
+  }
+
+  if(checkBtn)checkBtn.disabled=state.state==="checking"||state.state==="downloading"||!state.supported;
+  if(downloadBtn){
+    const show=state.state==="available" && !state.autoDownload;
+    downloadBtn.style.display=show?"inline-block":"none";
+    downloadBtn.disabled=!state.supported;
+  }
+  if(installBtn)installBtn.style.display=state.state==="downloaded"?"inline-block":"none";
+
+  if(progressWrap){
+    const show=state.state==="downloading";
+    progressWrap.style.display=show?"block":"none";
+  }
+  if(progressFill)progressFill.style.width=`${Math.max(0,Math.min(100,Number(state.percent||0)))}%`;
+  if(progressPercent)progressPercent.textContent=`${Math.round(Number(state.percent||0))} %`;
+  if(progressDetail)progressDetail.textContent=`${humanBytes(state.transferred)} / ${humanBytes(state.total)} • ${humanBytes(state.bytesPerSecond)}/s`;
+
+  if(notesBox&&notesText){
+    if(state.releaseNotes){
+      notesBox.style.display="block";
+      notesText.textContent=state.releaseNotes;
+    }else{
+      notesBox.style.display="none";
+    }
+  }
+
+  const typeMap={
+    idle:"",checking:"info",available:"warning",downloading:"info",
+    downloaded:"success",uptodate:"success",error:"error",unsupported:"warning"
+  };
+  const textMap={
+    idle:"Připraveno",checking:"Kontroluji",available:"Nová verze",
+    downloading:"Stahuji",downloaded:"Připraveno",uptodate:"Aktuální",
+    error:"Chyba",unsupported:"Nedostupné"
+  };
+  setUpdatePill(textMap[state.state]||"Čekám",typeMap[state.state]||"");
+}
+
+async function initUpdaterUi(force=false){
+  if(updateUiInitialized&&!force)return;
+  if(!window.kvaltikDesktop?.getUpdateInfo)return;
+  updateUiInitialized=true;
+
+  const prefs=data.updateSettings||{autoCheck:true,autoDownload:false};
+  document.getElementById("autoCheckUpdatesToggle").checked=prefs.autoCheck!==false;
+  document.getElementById("autoDownloadUpdatesToggle").checked=!!prefs.autoDownload;
+
+  try{
+    const info=await window.kvaltikDesktop.getUpdateInfo();
+    renderUpdateState(info);
+
+    if(prefs.autoCheck!==false&&info?.supported&&info?.configured){
+      setTimeout(()=>checkForUpdates(false),2500);
+    }
+  }catch(e){
+    renderUpdateState({state:"error",message:"Stav aktualizací se nepodařilo načíst.",supported:false,currentVersion:"—"});
+  }
+}
+async function checkForUpdates(showToast=true){
+  if(!window.kvaltikDesktop?.checkForUpdates)return;
+  const prefs=data.updateSettings||{};
+  const result=await window.kvaltikDesktop.checkForUpdates({autoDownload:!!prefs.autoDownload});
+  if(result&&!result.ok&&showToast)toast(result.error||"Kontrola aktualizací se nepodařila.");
+}
+function saveUpdatePreferences(){
+  data.updateSettings={
+    autoCheck:document.getElementById("autoCheckUpdatesToggle").checked,
+    autoDownload:document.getElementById("autoDownloadUpdatesToggle").checked
+  };
+  saveData("Nastavení aktualizací bylo uloženo.");
+}
+
+
+function migrateLegacyBrowserStorage(){
+  if(!window.kvaltikDesktop?.storageGet)return;
+  try{
+    const migrationKey="kvaltikHubDesktopStorageMigratedV16";
+    if(hubStorage.getItem(migrationKey)==="1")return;
+
+    const knownKeys=[USERS_KEY,SESSION_KEY];
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(k && (k.startsWith("kvaltikHubDataV2_") || knownKeys.includes(k))){
+          if(hubStorage.getItem(k)===null){
+            const value=localStorage.getItem(k);
+            if(value!==null)hubStorage.setItem(k,value);
+          }
+        }
+      }
+    }catch(e){
+      console.warn("Migrace starého localStorage nebyla dostupná:",e);
+    }
+    hubStorage.setItem(migrationKey,"1");
+  }catch(e){
+    console.warn("Migrace desktop úložiště:",e);
+  }
+}
+
+(function init(){
+  migrateLegacyBrowserStorage();
+  appShell.classList.add("locked");
+
+  const loadingScreen=document.getElementById("loadingScreen");
+  const loadingProgress=document.getElementById("loadingProgress");
+  const loadingPercent=document.getElementById("loadingPercent");
+  const loadingText=document.getElementById("loadingText");
+
+  let startupFinished=false;
+
+  function revealAppOrLogin(){
+    if(startupFinished)return;
+    startupFinished=true;
+    if(window.__kvaltikStartupFailsafe){
+      clearTimeout(window.__kvaltikStartupFailsafe);
+      window.__kvaltikStartupFailsafe=null;
+    }
+    try{
+      const session=hubStorage.getItem(SESSION_KEY)||sessionStorage.getItem(SESSION_KEY);
+      if(session){
+        const users=getUsers();
+        const u=users[session.toLowerCase()];
+        if(u){
+          currentUser={username:u.username,email:u.email};
+          data=loadUserData(u.username);
+          showApp();
+        }else{
+          clearSession();
+          showAuth();
+        }
+      }else{
+        showAuth();
+      }
+    }catch(err){
+      console.error("Kvaltík Hub startup error:",err);
+      clearSession();
+      showAuth();
+    }
+
+    if(loadingScreen){
+      loadingScreen.classList.add("hide");
+      setTimeout(()=>loadingScreen.remove(),500);
+    }
+  }
+
+  // Bezpečnostní pojistka: loading nikdy nezůstane viset.
+  setTimeout(revealAppOrLogin,5000);
+
+  const steps=[
+    {p:15,t:"Načítám Kvaltík Hub..."},
+    {p:32,t:"Kontroluji uživatelský účet..."},
+    {p:52,t:"Načítám ETS 2 a Farming data..."},
+    {p:72,t:"Připravuji virtuální firmu..."},
+    {p:88,t:"Načítám projekty a Discord..."},
+    {p:100,t:"Hotovo!"}
+  ];
+
+  let step=0;
+
+  function nextStep(){
+    try{
+      const s=steps[step];
+      if(loadingProgress)loadingProgress.style.width=s.p+"%";
+      if(loadingPercent)loadingPercent.textContent=s.p+" %";
+      if(loadingText)loadingText.textContent=s.t;
+      step++;
+
+      if(step<steps.length){
+        setTimeout(nextStep,220);
+      }else{
+        setTimeout(revealAppOrLogin,250);
+      }
+    }catch(err){
+      console.error("Loading screen error:",err);
+      revealAppOrLogin();
+    }
+  }
+
+  setTimeout(nextStep,120);
+})();

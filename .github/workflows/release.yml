@@ -1,0 +1,40 @@
+name: Vydat Kvaltik Hub
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Stahnout projekt
+        uses: actions/checkout@v4
+
+      - name: Nastavit Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Zkontrolovat verzi
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($tag -ne $pkg) {
+            Write-Error "Git tag v$tag neodpovida package.json verzi $pkg"
+            exit 1
+          }
+
+      - name: Nainstalovat zavislosti
+        run: npm install
+
+      - name: Vytvorit a publikovat Windows aktualizaci
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
