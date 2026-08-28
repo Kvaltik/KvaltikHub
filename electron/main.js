@@ -192,7 +192,7 @@ function initializeUpdater(){
     updateLog(`Aktualizace ${info.version} stažena.`);
     sendUpdateState({
       state:"downloaded",
-      message:"Aktualizace je stažená. Restartuj aplikaci a nainstaluj ji.",
+      message:"Aktualizace je stažená. Po restartu se tiše nainstaluje.",
       availableVersion:info.version||updateState.availableVersion,
       percent:100,
       releaseNotes:normalizeReleaseNotes(info.releaseNotes)||updateState.releaseNotes
@@ -580,8 +580,9 @@ ipcMain.handle("update-install",(_event,preferences={})=>{
     if(!backup.ok)return {ok:false,backupFailed:true,error:backup.error};
   }
 
-  updateLog("Spouštím instalaci stažené aktualizace.");
-  setImmediate(()=>autoUpdater.quitAndInstall(false,true));
+  updateLog("Spouštím tichou instalaci stažené aktualizace.");
+  // isSilent=true skryje průvodce NSIS; isForceRunAfter=true aplikaci po instalaci znovu spustí.
+  setImmediate(()=>autoUpdater.quitAndInstall(true,true));
   return {ok:true};
 });
 

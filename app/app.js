@@ -875,7 +875,7 @@ document.getElementById("downloadUpdateBtn").onclick=async()=>{
   if(result&&!result.ok)toast(result.error||"Aktualizaci se nepodařilo stáhnout.");
 };
 document.getElementById("installUpdateBtn").onclick=async()=>{
-  if(!confirm("Kvaltík Hub se zavře, nainstaluje novou verzi a znovu spustí. Pokračovat?"))return;
+  if(!confirm("Kvaltík Hub se zavře, tiše nainstaluje novou verzi a znovu spustí. Pokračovat?"))return;
 
   const prefs=getUpdatePrefs();
   const result=await window.kvaltikDesktop?.installUpdate?.({
