@@ -1,0 +1,14 @@
+Kvaltík Hub 19.0.0 — Centrum 2.0
+
+Novinky:
+- Chytrý plánovač úkolů, připomínek, streamů, videí, servisů a zakázek.
+- Centrum oznámení s historií a automatickými upozorněními na blízké termíny.
+- YouTube workflow od nápadu až po vydané video.
+- Souhrnné ETS 2 a Farming statistiky včetně měsíčních grafů a CSV exportu.
+- ETS 2 servisní centrum a rozšířený Farming management.
+- Globální hledání napříč jízdami, stroji, servisy, poznámkami, projekty, přáteli a videi.
+- Připnuté položky, volitelné dashboard widgety a přepínače beta funkcí.
+- Rozšířené profily přátel a správce projektů s deadlinem, checklistem a postupem.
+- Hudební přehrávač nově podporuje shuffle, repeat a historii přehrávání.
+- Export celé aplikace a samostatný CSV export financí.
+- Tichá automatická aktualizace bez instalačního průvodce zůstává zachována.

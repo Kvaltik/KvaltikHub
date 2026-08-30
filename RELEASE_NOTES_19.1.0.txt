@@ -1,0 +1,21 @@
+Kvaltík Hub 19.1.0
+
+Novinky:
+- Automatické denní zálohy s rotací posledních 10 kopií a obnovením jedním kliknutím.
+- Tisk aktivního reportu a uložení do PDF pomocí systémového dialogu.
+- Opakované denní, týdenní a měsíční úkoly.
+- Měsíční rozpočty pro ETS 2 a Farming.
+- Evidence tankování, ceny paliva a rozšířené servisní záznamy.
+- Minimální skladové zásoby ve Farming managementu.
+- Sedmidenní předpověď a více uložených měst.
+- YouTube šablony popisů a checklistů.
+- Oblíbené skladby, shuffle, repeat a historie přehrávání.
+- Odpadkový koš s možností obnovení záznamů.
+- Volitelný lokální PIN zámek.
+- Diagnostické chyby uživatelského rozhraní se zapisují do startup.log.
+
+Zachováno:
+- Tiché automatické aktualizace.
+- Záloha před aktualizací.
+- Stable/Beta kanály.
+- GitHub Releases.

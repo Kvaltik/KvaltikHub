@@ -1,0 +1,8 @@
+Kvaltík Hub 19.1.1
+
+Novinky a opravy:
+- Ke každému Farming stroji lze při přidání nahrát vlastní fotografii.
+- Fotografii lze později změnit přes tlačítko Upravit.
+- Při úpravě ostatních údajů zůstane stávající fotografie zachována.
+- Fotografie se zobrazuje přímo na kartě traktoru nebo jiného stroje.
+- Podporované jsou běžné obrazové formáty do velikosti 3 MB.

@@ -192,7 +192,7 @@ function initializeUpdater(){
     updateLog(`Aktualizace ${info.version} stažena.`);
     sendUpdateState({
       state:"downloaded",
-      message:"Aktualizace je stažená. Restartuj aplikaci a nainstaluj ji.",
+      message:"Aktualizace je stažená. Po restartu se tiše nainstaluje.",
       availableVersion:info.version||updateState.availableVersion,
       percent:100,
       releaseNotes:normalizeReleaseNotes(info.releaseNotes)||updateState.releaseNotes
@@ -374,11 +374,11 @@ function startInternalServer(){
             const geo=await geoRes.json();
             const loc=geo?.results?.[0];
             if(!loc)return json(res,404,{error:"Město nenalezeno"});
-            const weatherUrl=`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`;
+            const weatherUrl=`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&forecast_days=7&timezone=auto`;
             const wRes=await fetch(weatherUrl);
             if(!wRes.ok)throw new Error("Weather");
             const w=await wRes.json();
-            return json(res,200,{...w.current,locationName:[loc.name,loc.admin1].filter(Boolean).join(", ")});
+            return json(res,200,{...w.current,hourly:w.hourly,daily:w.daily,locationName:[loc.name,loc.admin1].filter(Boolean).join(", ")});
           }catch(e){
             return json(res,503,{error:"Počasí není dostupné"});
           }
@@ -467,6 +467,16 @@ function createWindow(){
 
   mainWindow.webContents.on("did-fail-load",(_event,errorCode,errorDescription)=>{
     writeStartupLog(`did-fail-load ${errorCode}: ${errorDescription}`);
+  });
+
+  mainWindow.webContents.on("console-message",(_event,...args)=>{
+    const details=args.length===1&&args[0]&&typeof args[0]==="object"
+      ?args[0]
+      :{level:args[0],message:args[1],lineNumber:args[2],sourceId:args[3]};
+    const level=String(details.level||"").toLowerCase();
+    if(level==="error"||level==="warning"||level==="warn"){
+      writeStartupLog(`RENDERER ${level.toUpperCase()}: ${details.message||"Neznámá chyba"} (${details.sourceId||"app"}:${details.lineNumber||0})`);
+    }
   });
 
   mainWindow.webContents.on("render-process-gone",(_event,details)=>{
@@ -580,8 +590,9 @@ ipcMain.handle("update-install",(_event,preferences={})=>{
     if(!backup.ok)return {ok:false,backupFailed:true,error:backup.error};
   }
 
-  updateLog("Spouštím instalaci stažené aktualizace.");
-  setImmediate(()=>autoUpdater.quitAndInstall(false,true));
+  updateLog("Spouštím tichou instalaci stažené aktualizace.");
+  // isSilent=true skryje průvodce NSIS; isForceRunAfter=true aplikaci po instalaci znovu spustí.
+  setImmediate(()=>autoUpdater.quitAndInstall(true,true));
   return {ok:true};
 });
 
