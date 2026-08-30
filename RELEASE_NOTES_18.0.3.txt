@@ -1,0 +1,8 @@
+Kvaltík Hub 18.0.3
+
+Opravy a vylepšení:
+- Automatická aktualizace se instaluje tiše bez průvodce NSIS.
+- Instalační balíček už nezobrazuje volbu instalace pro jednoho nebo všechny uživatele.
+- Kvaltík Hub se instaluje do profilu aktuálního uživatele bez požadavku na oprávnění správce.
+- Po dokončení aktualizace se aplikace automaticky znovu spustí.
+- Záloha dat před aktualizací, Stable/Beta kanál a distribuce přes GitHub Releases zůstávají zachované.

@@ -1,0 +1,6 @@
+Kvaltík Hub 18.0.2
+
+Opravy a vylepšení:
+- Automatická aktualizace se po stažení instaluje tiše bez zobrazení průvodce NSIS.
+- Kvaltík Hub se po dokončení aktualizace automaticky znovu spustí.
+- Záloha dat před aktualizací, Stable/Beta kanál a distribuce přes GitHub Releases zůstávají zachované.
