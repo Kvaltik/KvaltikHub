@@ -589,6 +589,25 @@ function renderAll(){
 }
 
 const modal=document.getElementById("modal"),modalForm=document.getElementById("modalForm");
+function optimizeUploadedImage(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error("Fotku se nepodařilo načíst."));
+    reader.onload=()=>{
+      const image=new Image();
+      image.onerror=()=>reject(new Error("Vybraný obrázek se nepodařilo otevřít."));
+      image.onload=()=>{
+        const maxSide=1600,scale=Math.min(1,maxSide/Math.max(image.width,image.height));
+        const width=Math.max(1,Math.round(image.width*scale)),height=Math.max(1,Math.round(image.height*scale));
+        const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+        const context=canvas.getContext("2d");context.fillStyle="#ffffff";context.fillRect(0,0,width,height);context.imageSmoothingEnabled=true;context.imageSmoothingQuality="high";context.drawImage(image,0,0,width,height);
+        resolve(canvas.toDataURL("image/jpeg",.86));
+      };
+      image.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 function openModal(title,fields,onSubmit,values={}){
   document.getElementById("modalTitle").textContent=title;
   modalForm.innerHTML=fields.map(f=>{
@@ -608,8 +627,8 @@ function openModal(title,fields,onSubmit,values={}){
       if(f.type!=="file"){result[f.name]=value;continue}
       if(value instanceof File&&value.size){
         if(!value.type.startsWith("image/")){toast("Vybraný soubor není obrázek.");return}
-        if(value.size>3*1024*1024){toast("Fotka může mít maximálně 3 MB.");return}
-        result[f.name]=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(value)});
+        if(value.size>12*1024*1024){toast("Fotka může mít maximálně 12 MB.");return}
+        try{result[f.name]=await optimizeUploadedImage(value)}catch(error){toast(error.message);return}
       }else result[f.name]=values[f.name]||"";
     }
     await onSubmit(result);closeModal();
@@ -726,7 +745,7 @@ window.deleteFarmFinance=i=>{if(confirm("Smazat položku?")){data.farmFinance.sp
 
 const machineFields=[
   {name:"brand",label:"Značka",required:true},{name:"model",label:"Model",required:true},
-  {name:"image",label:"Fotografie stroje",type:"file",accept:"image/*",full:true},
+  {name:"image",label:"Fotografie stroje (max. 12 MB)",type:"file",accept:"image/*",full:true},
   {name:"type",label:"Typ",type:"select",options:["Traktor","Kombajn","Řezačka","Nakladač","Přívěs","Jiné"]},
   {name:"hours",label:"Motohodiny",type:"number",step:"0.1"},
   {name:"status",label:"Stav",type:"select",options:["Aktivní","V servisu","Odstavený","Prodán"]},

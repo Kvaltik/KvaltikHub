@@ -1,0 +1,7 @@
+Kvaltík Hub 19.1.3
+
+Novinky a opravy:
+- Maximální velikost fotografie Farming stroje byla zvýšena z 3 MB na 12 MB.
+- Velké fotografie se před uložením automaticky zmenší na maximálně 1600 × 1600 px.
+- Obrázky se ukládají v optimalizované kvalitě, aby nezpomalovaly aplikaci a zálohy.
+- Zachováno nahrávání i pozdější změna fotografie přes formulář stroje.
