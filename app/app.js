@@ -169,7 +169,7 @@ function number(v){return new Intl.NumberFormat("cs-CZ",{maximumFractionDigits:1
 function euro(v){return new Intl.NumberFormat("cs-CZ",{maximumFractionDigits:0}).format(Number(v||0))+" €"}
 
 const pages={
-  dashboard:["Domů","Přehled Kvaltík Hubu"],ets2:["ETS 2","Kniha jízd Euro Truck Simulator 2"],company:["Virtuální firma","ETS 2 dopravní společnost"],
+  dashboard:["Přehled farmy","Stroje, pole, práce, servis a finance"],ets2:["ETS 2","Kniha jízd Euro Truck Simulator 2"],company:["Virtuální firma","ETS 2 dopravní společnost"],
   "ets-fleet":["ETS 2 – Vozový park","Tahače a firemní vozidla"],
   "ets-finance":["ETS 2 – Finance","Příjmy a výdaje"],
   "farm-machines":["Farming – Stroje","Evidence zemědělské techniky"],
@@ -202,14 +202,14 @@ document.querySelectorAll(".nav-folder-toggle").forEach(b=>b.onclick=()=>b.close
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>goTo(b.dataset.go));
 
 function renderDashboard(){
-  document.getElementById("statEtsTrips").textContent=data.ets2.length;
-  document.getElementById("statEtsKm").textContent=number(data.ets2.reduce((s,x)=>s+Number(x.km||0),0))+" km";
+  document.getElementById("statEtsTrips").textContent=data.farmMachines.length;
+  document.getElementById("statEtsKm").textContent=number(data.farmMachines.reduce((s,x)=>s+Number(x.hours||0),0))+" h";
   document.getElementById("statFarmJobs").textContent=data.farming.length;
-  document.getElementById("statImages").textContent=data.gallery.length;
-  document.getElementById("welcomeTitle").textContent=`Vítej, ${data.about.name||currentUser?.username||"Kvaltík"}! 🚜🚛`;
+  document.getElementById("statImages").textContent=data.farmFields.length;
+  document.getElementById("welcomeTitle").textContent=`Vítej na farmě, ${data.about.name||currentUser?.username||"Kvaltík"}! 🚜`;
 
-  const ets=[...data.ets2].slice(-4).reverse();
-  document.getElementById("recentEts").innerHTML=ets.length?ets.map(x=>`<div class="mini-item"><strong>${esc(x.from)} → ${esc(x.to)}</strong><small>${formatDate(x.date)} • ${esc(x.truck)} • ${number(x.km)} km</small></div>`).join(""):`<div class="empty">Zatím tu není žádná ETS 2 jízda.</div>`;
+  const services=data.farmMachines.filter(m=>Number(m.nextServiceHours)>0).sort((a,b)=>(Number(a.nextServiceHours)-Number(a.hours||0))-(Number(b.nextServiceHours)-Number(b.hours||0))).slice(0,4);
+  document.getElementById("recentEts").innerHTML=services.length?services.map(m=>{const left=Number(m.nextServiceHours)-Number(m.hours||0);return `<div class="mini-item"><strong>${esc(m.brand)} ${esc(m.model)}</strong><small>${left<=0?'⚠️ Servis je potřeba provést':`Do servisu zbývá ${number(left)} h`}</small></div>`}).join(""):`<div class="empty">Zatím není naplánovaný žádný servis.</div>`;
   const farm=[...data.farming].slice(-4).reverse();
   document.getElementById("recentFarm").innerHTML=farm.length?farm.map(x=>`<div class="mini-item"><strong>${esc(x.work)}</strong><small>${formatDate(x.date)} • ${esc(x.machine)} • ${esc(x.map)}</small></div>`).join(""):`<div class="empty">Zatím tu není žádná Farming práce.</div>`;
 }

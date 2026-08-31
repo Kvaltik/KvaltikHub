@@ -21,7 +21,7 @@
         <div class="loading-progress" id="loadingProgress"></div>
       </div>
       <div class="loading-percent" id="loadingPercent">0 %</div>
-      <small>ETS 2 • Farming • Projekty • Discord</small>
+      <small>STROJE • POLE • SERVIS • FINANCE</small>
     </div>
   </div>
 
@@ -63,7 +63,7 @@
     <div class="auth-card">
       <div class="auth-logo">K</div>
       <h1>Kvaltík Hub</h1>
-      <p id="authLead">Přihlas se do svého centra.</p>
+      <p id="authLead">Přihlas se do svého Farming centra.</p>
 
       <div class="auth-tabs">
         <button class="auth-tab active" data-auth="login">Přihlášení</button>
@@ -115,44 +115,17 @@
         <div class="brand-logo">K</div>
         <div>
           <h1>Kvaltík Hub</h1>
-          <span>Desktop • Moje centrum</span>
+          <span>Farming management</span>
         </div>
       </div>
 
       <nav class="nav">
-        <button class="nav-item active" data-page="dashboard">🏠 <span>Domů</span></button>
-
-        <div class="nav-folder">
-          <button class="nav-folder-toggle" data-folder="ets">
-            <span>🚛 ETS 2</span><span class="folder-arrow">▸</span>
-          </button>
-          <div class="nav-folder-items" id="folder-ets">
-            <button class="nav-subitem" data-page="ets2">📘 Kniha jízd</button>
-            <button class="nav-subitem" data-page="company">🏢 Virtuální firma</button>
-            <button class="nav-subitem" data-page="ets-fleet">🚛 Vozový park</button>
-            <button class="nav-subitem" data-page="ets-finance">💰 Finance</button>
-          </div>
-        </div>
-
-        <div class="nav-folder">
-          <button class="nav-folder-toggle" data-folder="farm">
-            <span>🚜 Farming</span><span class="folder-arrow">▸</span>
-          </button>
-          <div class="nav-folder-items" id="folder-farm">
-            <button class="nav-subitem" data-page="farming">📘 Kniha prací</button>
-            <button class="nav-subitem" data-page="farm-machines">🚜 Stroje</button>
-            <button class="nav-subitem" data-page="farm-fields">🌾 Pole</button>
-            <button class="nav-subitem" data-page="farm-storage">🏚️ Sklady</button>
-            <button class="nav-subitem" data-page="farm-finance">💰 Finance</button>
-          </div>
-        </div>
-
-        <button class="nav-item" data-page="friends">👥 <span>Přátelé</span></button>
-        <button class="nav-item" data-page="gallery">🖼️ <span>Obrázky</span></button>
-        <button class="nav-item" data-page="socials">🌐 <span>Sociální sítě</span></button>
-        <button class="nav-item" data-page="discord">💬 <span>Discord</span></button>
-        <button class="nav-item" data-page="projects">📁 <span>Další projekty</span></button>
-        <button class="nav-item" data-page="notes">📝 <span>Poznámky</span></button>
+        <button class="nav-item active" data-page="dashboard">🏠 <span>Přehled farmy</span></button>
+        <button class="nav-item" data-page="farm-machines">🚜 <span>Stroje a servis</span></button>
+        <button class="nav-item" data-page="farm-fields">🌾 <span>Pole a plodiny</span></button>
+        <button class="nav-item" data-page="farming">📘 <span>Pracovní záznamy</span></button>
+        <button class="nav-item" data-page="farm-storage">🏚️ <span>Sklady a zásoby</span></button>
+        <button class="nav-item" data-page="farm-finance">💰 <span>Finance</span></button>
         <button class="nav-item" data-page="settings">⚙️ <span>Nastavení</span></button>
       </nav>
 
@@ -185,61 +158,23 @@
         <div class="hero">
           <div>
             <span class="eyebrow">Vítej zpátky</span>
-            <h3 id="welcomeTitle">Kvaltík Hub 🚜🚛</h3>
-            <p>Jedno místo pro ETS 2, Farming Simulator, projekty, sociální sítě, Discord a tvoje obrázky.</p>
+            <h3 id="welcomeTitle">Kvaltík Hub Farming 🚜</h3>
+            <p>Stroje, servis, pole, pracovní záznamy, sklady a finance v jednom přehledném místě.</p>
           </div>
           <div class="hero-badge" id="heroBadge">K</div>
         </div>
 
         
-        <div class="dashboard-live-grid">
-          <div class="panel live-card">
-            <div class="live-card-icon">🕐</div>
-            <div>
-              <small>Aktuální čas</small>
-              <strong id="currentClock">--:--:--</strong>
-              <span id="currentDate">—</span>
-            </div>
-          </div>
-
-          <div class="panel live-card weather-card">
-            <div class="live-card-icon" id="weatherIcon">🌦️</div>
-            <div>
-              <small id="weatherCityLabel">Počasí</small>
-              <strong id="weatherTemp">— °C</strong>
-              <span id="weatherText">Načítám...</span>
-            </div>
-            <button class="action-btn weather-refresh" id="weatherRefreshBtn" title="Obnovit počasí">🔄</button>
-          </div>
-
-          <div class="panel live-card">
-            <div class="live-card-icon">👥</div>
-            <div>
-              <small>Přátelé</small>
-              <strong id="dashboardFriendsCount">0</strong>
-              <span>uložených kontaktů</span>
-            </div>
-          </div>
-
-          <div class="panel live-card">
-            <div class="live-card-icon">🎵</div>
-            <div>
-              <small>Hudba</small>
-              <strong id="dashboardTrackName">Nic nehraje</strong>
-              <span id="dashboardTrackArtist">Vyber skladby dole</span>
-            </div>
-          </div>
-        </div>
 <div class="stats-grid">
-          <div class="stat-card"><span>🚛</span><div><strong id="statEtsTrips">0</strong><small>ETS 2 jízd</small></div></div>
-          <div class="stat-card"><span>🛣️</span><div><strong id="statEtsKm">0 km</strong><small>ETS 2 kilometrů</small></div></div>
+          <div class="stat-card"><span>🚜</span><div><strong id="statEtsTrips">0</strong><small>Strojů</small></div></div>
+          <div class="stat-card"><span>⏱️</span><div><strong id="statEtsKm">0 h</strong><small>Motohodin celkem</small></div></div>
           <div class="stat-card"><span>🚜</span><div><strong id="statFarmJobs">0</strong><small>Farming záznamů</small></div></div>
-          <div class="stat-card"><span>🖼️</span><div><strong id="statImages">0</strong><small>Obrázků</small></div></div>
+          <div class="stat-card"><span>🌾</span><div><strong id="statImages">0</strong><small>Polí</small></div></div>
         </div>
 
         <div class="grid-2">
           <div class="panel">
-            <div class="panel-head"><h3>Poslední ETS 2 jízdy</h3><button class="link-btn" data-go="ets2">Otevřít</button></div>
+            <div class="panel-head"><h3>Servisní přehled</h3><button class="link-btn" data-go="farm-machines">Otevřít stroje</button></div>
             <div id="recentEts" class="mini-list"></div>
           </div>
           <div class="panel">
@@ -824,6 +759,12 @@
               <p class="update-small-note">Stable ignoruje GitHub Pre-release. Beta dovolí i testovací Pre-release verze.</p>
             </div>
           </div>
+        </div>
+        <div class="legacy-hidden" aria-hidden="true">
+          <span id="currentClock"></span><span id="currentDate"></span><span id="weatherIcon"></span>
+          <span id="weatherCityLabel"></span><span id="weatherTemp"></span><span id="weatherText"></span>
+          <button id="weatherRefreshBtn" type="button"></button><span id="dashboardFriendsCount"></span>
+          <span id="dashboardTrackName"></span><span id="dashboardTrackArtist"></span>
         </div>
       </section>
     </main>

@@ -1,0 +1,12 @@
+Kvaltík Hub 20.0.0
+
+Nová generace aplikace zaměřená na Farming:
+- Nové přehledné Farming menu bez ETS 2 a nesouvisejících sekcí.
+- Dashboard strojů, motohodin, pracovních záznamů, polí a servisů.
+- Stroje, galerie fotografií a servisní historie.
+- Pole a plodiny, pracovní záznamy, sklady, zásoby a finance.
+- Načítací obrazovka, registrace, přihlášení a zapamatování relace.
+- Moderní tmavý zelený Kvaltík vzhled.
+- Animovaná tlačítka, karty a servisní upozornění.
+- Respektování systémového nastavení pro omezení animací.
+- Zachování dosavadních Farming dat a automatických aktualizací.
