@@ -1,0 +1,6 @@
+Kvaltík Hub 19.2.1
+
+Změny:
+- Sekce Centrum 2.0 byla odstraněna z hlavního menu.
+- Levé menu je nyní přehlednější a zaměřené na hlavní části aplikace.
+- Dříve uložená data Centra 2.0 zůstávají bezpečně zachována.
