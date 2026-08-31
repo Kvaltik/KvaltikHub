@@ -1,0 +1,9 @@
+Kvaltík Hub 19.2.0
+
+Novinky:
+- Galerie až 10 fotografií ke každému Farming stroji.
+- Možnost zvolit hlavní fotografii a jednotlivé snímky odstranit.
+- Servisní historie stroje včetně data, motohodin, ceny a poznámky.
+- Nastavení dalšího servisu podle motohodin.
+- Barevné upozornění na kartě stroje a oznámení 10 hodin před servisem.
+- Starší stroje s jednou fotografií zůstávají plně kompatibilní.

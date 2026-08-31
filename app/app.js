@@ -295,7 +295,10 @@ function renderEtsFinancePage(){renderMoneySection(data.etsFinance,"etsFinance",
 function renderFarmFinancePage(){renderMoneySection(data.farmFinance,"farmFinance","farmFinanceTable")}
 function renderFarmMachines(){
   const el=document.getElementById("farmMachinesGrid"); if(!el)return;
-  el.innerHTML=data.farmMachines.length?data.farmMachines.map((m,i)=>`<div class="vehicle-card machine-card">${m.image?`<img class="machine-photo" src="${m.image}" alt="${esc(m.brand)} ${esc(m.model)}">`:`<div class="machine-photo-placeholder">🚜</div>`}<h4>🚜 ${esc(m.brand)} ${esc(m.model)}</h4><p>${esc(m.type||"Stroj")}</p><div class="card-kpis"><div class="card-kpi"><small>Motohodiny</small><strong>${number(m.hours)} h</strong></div><div class="card-kpi"><small>Stav</small><strong>${esc(m.status||"Aktivní")}</strong></div></div><div class="card-actions"><button class="secondary-btn" onclick="editFarmMachine(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmMachine(${i})">Smazat</button></div></div>`).join(""):`<div class="empty" style="grid-column:1/-1">Nemáš přidaný žádný stroj.</div>`;
+  el.innerHTML=data.farmMachines.length?data.farmMachines.map((m,i)=>{
+    const photos=machinePhotos(m),services=m.services||[],next=Number(m.nextServiceHours||0),remaining=next-Number(m.hours||0),due=next>0&&remaining<=0;
+    return `<div class="vehicle-card machine-card ${due?'machine-service-due':''}">${photos[0]?`<img class="machine-photo" src="${photos[0]}" alt="${esc(m.brand)} ${esc(m.model)}">`:`<div class="machine-photo-placeholder">🚜</div>`}<h4>🚜 ${esc(m.brand)} ${esc(m.model)}</h4><p>${esc(m.type||"Stroj")}</p><div class="card-kpis"><div class="card-kpi"><small>Motohodiny</small><strong>${number(m.hours)} h</strong></div><div class="card-kpi"><small>Další servis</small><strong>${next?`${number(next)} h`:'Nenastaven'}</strong></div></div>${next?`<div class="service-reminder ${due?'due':''}">${due?'⚠️ Servis je potřeba provést':`🔧 Do servisu zbývá ${number(remaining)} h`}</div>`:''}<div class="machine-meta">📷 ${photos.length} • 🛠️ ${services.length} servisů</div><div class="card-actions"><button class="secondary-btn" onclick="openMachineDetails(${i})">Detail</button><button class="secondary-btn" onclick="addMachinePhotos(${i})">+ Fotky</button><button class="secondary-btn" onclick="addMachineService(${i})">+ Servis</button><button class="secondary-btn" onclick="editFarmMachine(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmMachine(${i})">Smazat</button></div></div>`;
+  }).join(""):`<div class="empty" style="grid-column:1/-1">Nemáš přidaný žádný stroj.</div>`;
 }
 function renderFarmFields(){
   const el=document.getElementById("farmFieldsGrid"); if(!el)return;
@@ -608,6 +611,7 @@ function optimizeUploadedImage(file){
     reader.readAsDataURL(file);
   });
 }
+function machinePhotos(machine){return Array.isArray(machine.photos)&&machine.photos.length?machine.photos:(machine.image?[machine.image]:[])}
 function openModal(title,fields,onSubmit,values={}){
   document.getElementById("modalTitle").textContent=title;
   modalForm.innerHTML=fields.map(f=>{
@@ -748,12 +752,24 @@ const machineFields=[
   {name:"image",label:"Fotografie stroje (max. 12 MB)",type:"file",accept:"image/*",full:true},
   {name:"type",label:"Typ",type:"select",options:["Traktor","Kombajn","Řezačka","Nakladač","Přívěs","Jiné"]},
   {name:"hours",label:"Motohodiny",type:"number",step:"0.1"},
+  {name:"nextServiceHours",label:"Připomenout servis při motohodinách",type:"number",step:"0.1"},
   {name:"status",label:"Stav",type:"select",options:["Aktivní","V servisu","Odstavený","Prodán"]},
   {name:"note",label:"Poznámka",type:"textarea",full:true}
 ];
-document.getElementById("addFarmMachineBtn").onclick=()=>openModal("Přidat Farming stroj",machineFields,o=>{data.farmMachines.push({id:"machine_"+Date.now(),...o});saveData("Stroj byl přidán.")},{type:"Traktor",status:"Aktivní"});
-window.editFarmMachine=i=>openModal("Upravit stroj",machineFields,o=>{data.farmMachines[i]={...data.farmMachines[i],...o};saveData("Stroj byl upraven.")},data.farmMachines[i]);
+document.getElementById("addFarmMachineBtn").onclick=()=>openModal("Přidat Farming stroj",machineFields,o=>{data.farmMachines.push({id:"machine_"+Date.now(),photos:o.image?[o.image]:[],services:[],...o});saveData("Stroj byl přidán.")},{type:"Traktor",status:"Aktivní"});
+window.editFarmMachine=i=>openModal("Upravit stroj",machineFields,o=>{const old=data.farmMachines[i],photos=machinePhotos(old);if(o.image&&o.image!==old.image){if(photos.length)photos[0]=o.image;else photos.push(o.image)}data.farmMachines[i]={...old,...o,photos};saveData("Stroj byl upraven.")},data.farmMachines[i]);
 window.deleteFarmMachine=i=>{if(confirm("Smazat stroj?")){data.farmMachines.splice(i,1);saveData("Stroj byl smazán.")}};
+
+window.addMachinePhotos=i=>{
+  const input=document.createElement("input");input.type="file";input.accept="image/*";input.multiple=true;
+  input.onchange=async()=>{const machine=data.farmMachines[i],photos=machinePhotos(machine);for(const file of [...input.files]){if(photos.length>=10){toast("Ke stroji lze uložit nejvýše 10 fotografií.");break}if(!file.type.startsWith("image/")||file.size>12*1024*1024){toast(`Fotka ${file.name} není podporovaná nebo je větší než 12 MB.`);continue}try{photos.push(await optimizeUploadedImage(file))}catch(error){toast(error.message)}}machine.photos=photos;machine.image=photos[0]||"";saveData("Fotografie byly přidány do galerie.")};input.click();
+};
+window.deleteMachinePhoto=(i,p)=>{if(!confirm("Odstranit tuto fotografii?"))return;const machine=data.farmMachines[i],photos=machinePhotos(machine);photos.splice(p,1);machine.photos=photos;machine.image=photos[0]||"";saveData("Fotografie byla odstraněna.");openMachineDetails(i)};
+window.setMainMachinePhoto=(i,p)=>{const machine=data.farmMachines[i],photos=machinePhotos(machine),chosen=photos.splice(p,1)[0];photos.unshift(chosen);machine.photos=photos;machine.image=photos[0];saveData("Hlavní fotografie byla změněna.");openMachineDetails(i)};
+window.openMachineDetails=i=>{const m=data.farmMachines[i],photos=machinePhotos(m),services=[...(m.services||[])].reverse();document.getElementById("modalTitle").textContent=`${m.brand} ${m.model}`;modalForm.innerHTML=`<div class="full machine-gallery">${photos.length?photos.map((photo,p)=>`<div class="machine-gallery-item"><img src="${photo}" alt="Fotografie stroje"><div><button type="button" class="secondary-btn" onclick="setMainMachinePhoto(${i},${p})">${p===0?'Hlavní':'Nastavit hlavní'}</button><button type="button" class="danger-btn" onclick="deleteMachinePhoto(${i},${p})">Smazat</button></div></div>`).join(''):'<div class="empty">Galerie je zatím prázdná.</div>'}</div><div class="full detail-toolbar"><button type="button" class="primary-btn" onclick="addMachinePhotos(${i})">+ Přidat fotografie</button><button type="button" class="primary-btn" onclick="addMachineService(${i})">+ Přidat servis</button></div><div class="full"><h3>🛠️ Servisní historie</h3><div class="machine-service-list">${services.length?services.map((s,ri)=>{const si=(m.services||[]).length-1-ri;return `<article><div><strong>${esc(s.type||'Servis')}</strong><small>${formatDate(s.date)} • ${number(s.hours)} h${s.cost?` • ${euro(s.cost)}`:''}</small><p>${esc(s.note||'')}</p></div><button type="button" class="danger-btn" onclick="deleteMachineService(${i},${si})">Smazat</button></article>`}).join(''):'<div class="empty">Zatím nebyl zaznamenán žádný servis.</div>'}</div></div><div class="full detail-toolbar"><button type="button" class="secondary-btn" id="cancelModal">Zavřít</button></div>`;modalForm.onsubmit=e=>e.preventDefault();modal.classList.add("open");document.getElementById("cancelModal").onclick=closeModal};
+const machineServiceFields=[{name:"date",label:"Datum",type:"date",required:true},{name:"type",label:"Typ servisu",type:"select",options:["Pravidelný servis","Oprava","Výměna oleje","Pneumatiky","Kontrola","Jiné"]},{name:"hours",label:"Stav motohodin",type:"number",step:"0.1",required:true},{name:"cost",label:"Cena",type:"number",step:"0.01"},{name:"nextServiceHours",label:"Další servis při motohodinách",type:"number",step:"0.1"},{name:"note",label:"Poznámka",type:"textarea",full:true}];
+window.addMachineService=i=>{const m=data.farmMachines[i];openModal(`Servis – ${m.brand} ${m.model}`,machineServiceFields,o=>{m.services=m.services||[];m.services.push({id:"mservice_"+Date.now(),...o});if(Number(o.hours)>Number(m.hours||0))m.hours=o.hours;if(o.nextServiceHours)m.nextServiceHours=o.nextServiceHours;saveData("Servis byl uložen do historie.")},{date:new Date().toISOString().slice(0,10),type:"Pravidelný servis",hours:m.hours||0,nextServiceHours:m.nextServiceHours||""})};
+window.deleteMachineService=(i,s)=>{if(!confirm("Smazat servisní záznam?"))return;data.farmMachines[i].services.splice(s,1);saveData("Servisní záznam byl smazán.");openMachineDetails(i)};
 
 const fieldFields=[
   {name:"number",label:"Číslo / název pole",required:true},
@@ -844,7 +860,9 @@ function renderPlanner2(){
 }
 function generatedNotifications(){
   const now=new Date(), limit=new Date(Date.now()+7*86400000);
-  return data.planner.filter(x=>!x.done&&x.date).filter(x=>{const d=new Date(x.date+"T23:59:59");return d>=now&&d<=limit}).map(x=>({id:"plan_"+x.id,type:x.type,title:x.title,text:`Termín ${formatDate(x.date)}${x.time?` v ${x.time}`:''}`,date:x.date,read:false,generated:true}));
+  const planned=data.planner.filter(x=>!x.done&&x.date).filter(x=>{const d=new Date(x.date+"T23:59:59");return d>=now&&d<=limit}).map(x=>({id:"plan_"+x.id,type:x.type,title:x.title,text:`Termín ${formatDate(x.date)}${x.time?` v ${x.time}`:''}`,date:x.date,read:false,generated:true}));
+  const services=data.farmMachines.filter(m=>Number(m.nextServiceHours)>0&&Number(m.nextServiceHours)-Number(m.hours||0)<=10).map(m=>{const left=Number(m.nextServiceHours)-Number(m.hours||0);return{id:`farm_service_${m.id}_${m.nextServiceHours}`,type:"Servis stroje",title:`${m.brand} ${m.model}`,text:left<=0?`Servis je potřeba provést (${number(m.hours)} h).`:`Do servisu zbývá ${number(left)} motohodin.`,date:new Date().toISOString().slice(0,10),read:false,generated:true}});
+  return [...planned,...services];
 }
 function renderNotifications2(){
   const el=document.getElementById("notificationList");if(!el)return;
