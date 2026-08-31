@@ -32,9 +32,36 @@ jobs:
           }
 
       - name: Nainstalovat zavislosti
-        run: npm install
+        run: npm ci
 
-      - name: Vytvorit a publikovat Windows aktualizaci
-        run: npm run release
+      - name: Vytvorit Windows aktualizaci
+        run: npm run release:build
+
+      - name: Overit vystupni soubory
+        shell: powershell
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $required = @(
+            "dist\Kvaltik-Hub-Setup-$version-x64.exe",
+            "dist\Kvaltik-Hub-Setup-$version-x64.exe.blockmap",
+            "dist\latest.yml"
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path -LiteralPath $file)) {
+              Write-Error "Chybi vystupni soubor: $file"
+              exit 1
+            }
+          }
+
+      - name: Vytvorit GitHub Release a nahrat aktualizaci
+        shell: powershell
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          gh release create "${{ github.ref_name }}" `
+            "dist\Kvaltik-Hub-Setup-$version-x64.exe" `
+            "dist\Kvaltik-Hub-Setup-$version-x64.exe.blockmap" `
+            "dist\latest.yml" `
+            --title "Kvaltik Hub $version" `
+            --notes-file "RELEASE_NOTES_$version.txt"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

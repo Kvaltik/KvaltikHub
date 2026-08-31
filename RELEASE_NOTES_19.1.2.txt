@@ -1,0 +1,8 @@
+Kvaltík Hub 19.1.2
+
+Novinky a opravy:
+- Ke každému Farming stroji lze přidat a později změnit vlastní fotografii.
+- Fotografie se zobrazuje přímo na kartě traktoru nebo jiného stroje.
+- Opraveno vydávání aktualizací přes GitHub Releases.
+- Workflow nyní před publikováním ověří instalační EXE, blockmap a latest.yml.
+- Release se zveřejní pouze tehdy, když jsou všechny aktualizační soubory připravené.
