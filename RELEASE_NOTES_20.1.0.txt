@@ -1,0 +1,11 @@
+Kvaltík Hub 20.1.0
+
+Novinky:
+- Zakázky s přiřazeným polem, strojem, druhem práce, odměnou a stavem.
+- Rychlý přechod zakázky přes stavy Plánováno, Probíhá a Hotovo.
+- Evidence tankování podle stroje, motohodin, litrů a ceny paliva.
+- Automatický výpočet celkové ceny tankování.
+- Automatické propojení paliva s Farming financemi.
+- Detailní historie polí s pracemi, plodinami, stroji, výnosem a náklady.
+- Filtrování historie podle konkrétního pole.
+- Automatické propojení nákladů na pole s Farming financemi.

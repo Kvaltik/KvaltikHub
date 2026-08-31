@@ -1,6 +1,6 @@
 {
   "name": "kvaltik-hub-desktop",
-  "version": "20.0.0",
+  "version": "20.1.0",
   "description": "Kvaltík Hub Farming - správa strojů, polí, servisu, skladů a financí",
   "main": "electron/main.js",
   "author": "Kvaltik",

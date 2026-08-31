@@ -126,6 +126,9 @@
         <button class="nav-item" data-page="farming">📘 <span>Pracovní záznamy</span></button>
         <button class="nav-item" data-page="farm-storage">🏚️ <span>Sklady a zásoby</span></button>
         <button class="nav-item" data-page="farm-finance">💰 <span>Finance</span></button>
+        <button class="nav-item" data-page="farm-jobs">📋 <span>Zakázky</span></button>
+        <button class="nav-item" data-page="farm-fuel">⛽ <span>Tankování</span></button>
+        <button class="nav-item" data-page="field-history">🌱 <span>Historie polí</span></button>
         <button class="nav-item" data-page="settings">⚙️ <span>Nastavení</span></button>
       </nav>
 
@@ -555,6 +558,24 @@
           <button class="primary-btn" id="addNoteBtn">+ Nová poznámka</button>
         </div>
         <div id="notesGrid" class="project-grid"></div>
+      </section>
+
+      <section class="page" id="page-farm-jobs">
+        <div class="section-head"><div><h3>📋 Zakázky a práce</h3><p>Plánuj práce, přiřazuj pole a stroje a sleduj jejich dokončení.</p></div><button class="primary-btn" id="addFarmJobBtn">+ Nová zakázka</button></div>
+        <div class="stats-grid jobs-summary" id="farmJobsSummary"></div>
+        <div class="project-grid" id="farmJobsGrid"></div>
+      </section>
+
+      <section class="page" id="page-farm-fuel">
+        <div class="section-head"><div><h3>⛽ Tankování a spotřeba</h3><p>Palivo, ceny a provozní náklady propojené s Farming financemi.</p></div><button class="primary-btn" id="addFarmFuelBtn">+ Přidat tankování</button></div>
+        <div class="stats-grid fuel-summary"><div class="stat-card"><span>⛽</span><div><strong id="fuelLitersStat">0 l</strong><small>Palivo celkem</small></div></div><div class="stat-card"><span>💶</span><div><strong id="fuelCostStat">0 €</strong><small>Náklady</small></div></div><div class="stat-card"><span>🧾</span><div><strong id="fuelCountStat">0</strong><small>Tankování</small></div></div></div>
+        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Stroj</th><th>Motohodiny</th><th>Litry</th><th>Spotřeba</th><th>Cena/l</th><th>Celkem</th><th></th></tr></thead><tbody id="farmFuelTableBody"></tbody></table></div></div>
+      </section>
+
+      <section class="page" id="page-field-history">
+        <div class="section-head"><div><h3>🌱 Historie polí</h3><p>Kompletní přehled prací, plodin, výnosů a nákladů jednotlivých polí.</p></div><button class="primary-btn" id="addFieldHistoryBtn">+ Přidat záznam</button></div>
+        <div class="panel field-filter"><label>Vybrat pole<select id="fieldHistoryFilter"><option value="">Všechna pole</option></select></label></div>
+        <div class="smart-list smart-top-gap" id="fieldHistoryList"></div>
       </section>
 
       <section class="page" id="page-settings">
