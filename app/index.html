@@ -129,6 +129,7 @@
         <button class="nav-item" data-page="farm-jobs">📋 <span>Zakázky</span></button>
         <button class="nav-item" data-page="farm-fuel">⛽ <span>Tankování</span></button>
         <button class="nav-item" data-page="field-history">🌱 <span>Historie polí</span></button>
+        <button class="nav-item" data-page="friends">👥 <span>Tým farmy</span></button>
         <div class="nav-folder">
           <button class="nav-folder-toggle" data-folder="farm-center"><span>🌿 Správa farmy</span><span class="folder-arrow">▸</span></button>
           <div class="nav-folder-items" id="folder-farm-center">
@@ -391,15 +392,15 @@
 
       <section class="page" id="page-friends">
         <div class="section-head">
-          <div><h3>👥 Přátelé</h3><p>Seznam kamarádů, spoluhráčů a kontaktů pro ETS 2, Farming a Discord.</p></div>
-          <button class="primary-btn" id="addFriendBtn">+ Přidat přítele</button>
+          <div><h3>👥 Tým farmy</h3><p>Přátelé, spoluhráči, kontakty a historie společných Farming prací.</p></div>
+          <button class="primary-btn" id="addFriendBtn">+ Přidat člena</button>
         </div>
 
         <div class="stats-grid">
           <div class="stat-card"><span>👥</span><div><strong id="friendsCount">0</strong><small>Přátel</small></div></div>
           <div class="stat-card"><span>⭐</span><div><strong id="favoriteFriendsCount">0</strong><small>Oblíbených</small></div></div>
-          <div class="stat-card"><span>🚛</span><div><strong id="etsFriendsCount">0</strong><small>ETS 2 kontaktů</small></div></div>
-          <div class="stat-card"><span>🚜</span><div><strong id="farmFriendsCount">0</strong><small>Farming kontaktů</small></div></div>
+          <div class="stat-card"><span>⏱️</span><div><strong id="etsFriendsCount">0 h</strong><small>Společných hodin</small></div></div>
+          <div class="stat-card"><span>💶</span><div><strong id="farmFriendsCount">0 €</strong><small>Rozdělených odměn</small></div></div>
         </div>
 
         <div class="panel friends-toolbar">
@@ -407,8 +408,7 @@
           <select id="friendFilter">
             <option value="all">Všichni</option>
             <option value="favorite">Oblíbení ⭐</option>
-            <option value="ets">ETS 2 🚛</option>
-            <option value="farm">Farming 🚜</option>
+            <option value="active">Aktivní členové 🚜</option>
             <option value="discord">Discord 💬</option>
           </select>
         </div>

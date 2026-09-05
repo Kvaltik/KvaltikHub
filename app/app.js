@@ -71,7 +71,7 @@ function saveData(message){
   renderAll();
   if(message)toast(message);
 }
-const farmDataKeys=["farming","farmMachines","farmFields","farmStorage","farmFinance","farmJobs","farmFuel","fieldHistory","farmManagement","planner","gallery"];
+const farmDataKeys=["farming","farmMachines","farmFields","farmStorage","farmFinance","farmJobs","farmFuel","fieldHistory","farmManagement","planner","gallery","friends"];
 function farmSnapshot(){return Object.fromEntries(farmDataKeys.map(k=>[k,structuredClone(data[k]||[])]))}
 function saveActiveFarmSnapshot(){const profile=(data.farmProfiles||[]).find(x=>x.id===data.activeFarmId);if(profile)profile.snapshot=farmSnapshot()}
 function renderFarmProfiles(){const select=document.getElementById("activeFarmSelect");if(!select)return;const profiles=data.farmProfiles||[];select.innerHTML=profiles.map(x=>`<option value="${esc(x.id)}" ${x.id===data.activeFarmId?'selected':''}>${esc(x.name)}</option>`).join('')||'<option value="">Moje farma</option>'}
@@ -192,7 +192,7 @@ const pages={
   "farm-jobs":["Zakázky a práce","Plánování a průběh farmářských zakázek"],
   "farm-fuel":["Tankování","Spotřeba paliva a provozní náklady"],
   "field-history":["Historie polí","Práce, plodiny, výnosy a náklady podle polí"],
-  friends:["Přátelé","Kamarádi, spoluhráči a kontakty"],
+  friends:["Tým farmy","Přátelé, spoluhráči a společné práce"],
   planner:["Chytrý plánovač","Kalendář, úkoly a připomínky"],notifications:["Centrum oznámení","Historie důležitých událostí"],
   youtube:["YouTube centrum","Tvorba videí od nápadu po vydání"],statistics:["Statistiky","Výsledky, grafy a rekordy"],
   "ets-service":["ETS 2 servis","Servisní historie a plánované intervaly"],"farm-management":["Farming management","Kompletní správa farmy"],
@@ -344,37 +344,38 @@ function renderFriends(){
     const matchesFilter=
       filter==="all"||
       (filter==="favorite"&&f.favorite)||
-      (filter==="ets"&&f.ets)||
-      (filter==="farm"&&f.farm)||
+      (filter==="active"&&f.status!=="Neaktivní")||
       (filter==="discord"&&f.discord);
     return matchesText&&matchesFilter;
   });
 
   document.getElementById("friendsCount").textContent=friends.length;
   document.getElementById("favoriteFriendsCount").textContent=friends.filter(f=>f.favorite).length;
-  document.getElementById("etsFriendsCount").textContent=friends.filter(f=>f.ets).length;
-  document.getElementById("farmFriendsCount").textContent=friends.filter(f=>f.farm).length;
+  const activities=friends.flatMap(f=>f.activities||[]);
+  document.getElementById("etsFriendsCount").textContent=number(activities.reduce((s,x)=>s+Number(x.hours||0),0))+" h";
+  document.getElementById("farmFriendsCount").textContent=euro(activities.reduce((s,x)=>s+Number(x.reward||0),0));
   document.getElementById("dashboardFriendsCount").textContent=friends.length;
 
   document.getElementById("friendsGrid").innerHTML=shown.length?shown.map((f,idx)=>{
     const i=friends.indexOf(f);
     return `<div class="friend-card">
       <div class="friend-card-head">
-        <div class="friend-avatar">${esc((f.name||"?").charAt(0).toUpperCase())}</div>
+        ${f.photo?`<img class="friend-avatar friend-photo" src="${f.photo}" alt="${esc(f.name)}">`:`<div class="friend-avatar">${esc((f.name||"?").charAt(0).toUpperCase())}</div>`}
         <div><h4>${esc(f.name)}</h4><p>${esc(f.nickname||"")}</p></div>
         <div class="friend-favorite">${f.favorite?"⭐":"☆"}</div>
       </div>
       <div class="friend-links">
         ${f.discord?`<div>💬 Discord: ${esc(f.discord)}</div>`:""}
         ${f.steam?`<div>🎮 Steam: ${esc(f.steam)}</div>`:""}
-        ${f.ets?`<div>🚛 ETS 2</div>`:""}
-        ${f.farm?`<div>🚜 Farming</div>`:""}
-        ${f.jointTrips?`<div>🛣️ Společné jízdy: ${number(f.jointTrips)} • ${number(f.jointKm)} km</div>`:""}
-        ${f.farmJobs?`<div>🌾 Společné práce: ${number(f.farmJobs)}</div>`:""}
+        <div>🚜 ${esc(f.role||"Spoluhráč")} • ${esc(f.status||"Aktivní")}</div>
+        <div>🌾 Společné práce: ${(f.activities||[]).length} • ${number((f.activities||[]).reduce((s,x)=>s+Number(x.hours||0),0))} h</div>
+        ${f.rating?`<div>⭐ Hodnocení: ${esc(f.rating)}/5</div>`:""}
         ${f.note?`<div>📝 ${esc(f.note)}</div>`:""}
       </div>
       <div class="card-actions">
         <button class="secondary-btn" onclick="toggleFriendFavorite(${i})">${f.favorite?"Odebrat ⭐":"Přidat ⭐"}</button>
+        <button class="secondary-btn" onclick="addFriendActivity(${i})">+ Práce</button>
+        <button class="secondary-btn" onclick="showFriendHistory(${i})">Historie</button>
         <button class="secondary-btn" onclick="editFriend(${i})">Upravit</button>
         <button class="danger-btn" onclick="deleteFriend(${i})">Smazat</button>
       </div>
@@ -634,7 +635,7 @@ function renderFarmOperations(){
   if(jobs){
     const counts={planned:data.farmJobs.filter(x=>x.status==="Plánováno").length,active:data.farmJobs.filter(x=>x.status==="Probíhá").length,done:data.farmJobs.filter(x=>x.status==="Hotovo").length};
     document.getElementById("farmJobsSummary").innerHTML=`<div class="stat-card"><span>📅</span><div><strong>${counts.planned}</strong><small>Plánováno</small></div></div><div class="stat-card"><span>🚜</span><div><strong>${counts.active}</strong><small>Probíhá</small></div></div><div class="stat-card"><span>✅</span><div><strong>${counts.done}</strong><small>Hotovo</small></div></div>`;
-    jobs.innerHTML=data.farmJobs.length?[...data.farmJobs].reverse().map((x,ri)=>{const i=data.farmJobs.length-1-ri;return `<article class="project-card"><span class="job-status status-${x.status==='Hotovo'?'done':x.status==='Probíhá'?'active':'planned'}">${esc(x.status)}</span><h4>${esc(x.title)}</h4><p>${esc(x.work||'Práce')} • ${esc(x.field||'Bez pole')}</p><div class="project-meta"><span class="tag">📅 ${formatDate(x.date)}</span><span class="tag">🚜 ${esc(x.machine||'Bez stroje')}</span>${x.reward?`<span class="tag">💰 ${euro(x.reward)}</span>`:''}</div><div class="card-actions"><button class="secondary-btn" onclick="advanceFarmJob(${i})">Další stav</button><button class="secondary-btn" onclick="editFarmJob(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmJob(${i})">Smazat</button></div></article>`}).join(''):'<div class="empty">Zatím nejsou vytvořené žádné zakázky.</div>';
+    jobs.innerHTML=data.farmJobs.length?[...data.farmJobs].reverse().map((x,ri)=>{const i=data.farmJobs.length-1-ri;return `<article class="project-card"><span class="job-status status-${x.status==='Hotovo'?'done':x.status==='Probíhá'?'active':'planned'}">${esc(x.status)}</span><h4>${esc(x.title)}</h4><p>${esc(x.work||'Práce')} • ${esc(x.field||'Bez pole')}</p><div class="project-meta"><span class="tag">📅 ${formatDate(x.date)}</span><span class="tag">🚜 ${esc(x.machine||'Bez stroje')}</span>${x.team?`<span class="tag">👥 ${esc(x.team)}</span>`:''}${x.hours?`<span class="tag">⏱️ ${number(x.hours)} h</span>`:''}${x.reward?`<span class="tag">💰 ${euro(x.reward)}</span>`:''}</div><div class="card-actions"><button class="secondary-btn" onclick="advanceFarmJob(${i})">Další stav</button><button class="secondary-btn" onclick="editFarmJob(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmJob(${i})">Smazat</button></div></article>`}).join(''):'<div class="empty">Zatím nejsou vytvořené žádné zakázky.</div>';
   }
   const fuel=document.getElementById("farmFuelTableBody");
   if(fuel){
@@ -810,10 +811,10 @@ window.addMachineService=i=>{const m=data.farmMachines[i];openModal(`Servis – 
 window.deleteMachineService=(i,s)=>{if(!confirm("Smazat servisní záznam?"))return;data.farmMachines[i].services.splice(s,1);saveData("Servisní záznam byl smazán.");openMachineDetails(i)};
 
 function farmOptions(items,empty){return [empty,...items.filter(Boolean)]}
-function jobFields(){return[{name:"title",label:"Název zakázky",required:true,full:true},{name:"date",label:"Datum",type:"date",required:true},{name:"status",label:"Stav",type:"select",options:["Plánováno","Probíhá","Hotovo"]},{name:"field",label:"Pole",type:"select",options:farmOptions(data.farmFields.map(x=>x.number),"Bez pole")},{name:"machine",label:"Stroj",type:"select",options:farmOptions(data.farmMachines.map(x=>`${x.brand} ${x.model}`),"Bez stroje")},{name:"work",label:"Druh práce",type:"select",options:["Orba","Setí","Hnojení","Postřik","Sklizeň","Přeprava","Jiné"]},{name:"reward",label:"Odměna (€)",type:"number",step:"0.01"},{name:"note",label:"Poznámka",type:"textarea",full:true}]}
+function jobFields(){return[{name:"title",label:"Název zakázky",required:true,full:true},{name:"date",label:"Datum",type:"date",required:true},{name:"status",label:"Stav",type:"select",options:["Plánováno","Probíhá","Hotovo"]},{name:"field",label:"Pole",type:"select",options:farmOptions(data.farmFields.map(x=>x.number),"Bez pole")},{name:"machine",label:"Stroj",type:"select",options:farmOptions(data.farmMachines.map(x=>`${x.brand} ${x.model}`),"Bez stroje")},{name:"team",label:"Člen týmu",type:"select",options:farmOptions(data.friends.map(x=>x.name),"Bez spoluhráče")},{name:"work",label:"Druh práce",type:"select",options:["Orba","Setí","Hnojení","Postřik","Sklizeň","Přeprava","Jiné"]},{name:"hours",label:"Doba práce (h)",type:"number",step:"0.1"},{name:"reward",label:"Celková odměna (€)",type:"number",step:"0.01"},{name:"teamReward",label:"Podíl spoluhráče (€)",type:"number",step:"0.01"},{name:"note",label:"Poznámka",type:"textarea",full:true}]}
 document.getElementById("addFarmJobBtn").onclick=()=>openModal("Nová zakázka",jobFields(),o=>{data.farmJobs.push({id:"job_"+Date.now(),...o});saveData("Zakázka byla vytvořena.")},{date:new Date().toISOString().slice(0,10),status:"Plánováno"});
 window.editFarmJob=i=>openModal("Upravit zakázku",jobFields(),o=>{data.farmJobs[i]={...data.farmJobs[i],...o};saveData("Zakázka byla upravena.")},data.farmJobs[i]);
-window.advanceFarmJob=i=>{const states=["Plánováno","Probíhá","Hotovo"],x=data.farmJobs[i];x.status=states[Math.min(states.length-1,Math.max(0,states.indexOf(x.status))+1)];saveData("Stav zakázky byl změněn.")};
+window.advanceFarmJob=i=>{const states=["Plánováno","Probíhá","Hotovo"],x=data.farmJobs[i];x.status=states[Math.min(states.length-1,Math.max(0,states.indexOf(x.status))+1)];if(x.status==="Hotovo"&&x.team&&!x.teamActivityId){const friend=data.friends.find(f=>f.name===x.team);if(friend){friend.activities=friend.activities||[];const activity={id:"teamwork_"+Date.now(),date:x.date,work:x.work,field:x.field,machine:x.machine,hours:x.hours,reward:x.teamReward,note:`Zakázka: ${x.title}`};friend.activities.push(activity);x.teamActivityId=activity.id}}saveData("Stav zakázky byl změněn.")};
 window.deleteFarmJob=i=>{if(confirm("Smazat zakázku?")){data.farmJobs.splice(i,1);saveData("Zakázka byla smazána.")}};
 
 function fuelFields(){return[{name:"date",label:"Datum",type:"date",required:true},{name:"machine",label:"Stroj",type:"select",options:farmOptions(data.farmMachines.map(x=>`${x.brand} ${x.model}`),"Jiný stroj")},{name:"hours",label:"Stav motohodin",type:"number",step:"0.1"},{name:"liters",label:"Natankováno (l)",type:"number",step:"0.01",required:true},{name:"price",label:"Cena za litr (€)",type:"number",step:"0.001",required:true},{name:"note",label:"Poznámka",type:"textarea",full:true}]}
@@ -863,27 +864,28 @@ window.deleteFarm=i=>{if(confirm("Smazat záznam?")){data.farming.splice(i,1);sa
 const friendFields=[
   {name:"name",label:"Jméno",required:true},
   {name:"nickname",label:"Přezdívka"},
-  {name:"discord",label:"Discord"},
-  {name:"steam",label:"Steam"},
-  {name:"ets",label:"Hraje ETS 2",type:"select",options:["Ano","Ne"]},
-  {name:"farm",label:"Hraje Farming",type:"select",options:["Ano","Ne"]},
-  {name:"jointTrips",label:"Společné jízdy",type:"number"},{name:"jointKm",label:"Společné km",type:"number",step:"0.1"},
-  {name:"farmJobs",label:"Společné Farming práce",type:"number"},{name:"profile",label:"Odkaz na profil",type:"url"},
+  {name:"photo",label:"Profilová fotografie (max. 12 MB)",type:"file",accept:"image/*",full:true},
+  {name:"discord",label:"Discord"},{name:"steam",label:"Steam"},
+  {name:"role",label:"Role",type:"select",options:["Spoluhráč","Řidič","Pracovník","Správce","Majitel"]},
+  {name:"status",label:"Stav",type:"select",options:["Aktivní","Neaktivní"]},
+  {name:"rating",label:"Hodnocení 1–5",type:"number",step:"1"},{name:"profile",label:"Odkaz na profil",type:"url"},
   {name:"favorite",label:"Oblíbený",type:"select",options:["Ne","Ano"]},
   {name:"note",label:"Poznámka",type:"textarea",full:true}
 ];
-function normalizeFriend(o){
-  return {...o,ets:o.ets==="Ano",farm:o.farm==="Ano",favorite:o.favorite==="Ano"};
-}
+function normalizeFriend(o){return {...o,favorite:o.favorite==="Ano"}}
 function friendEditValues(f){
-  return {...f,ets:f.ets?"Ano":"Ne",farm:f.farm?"Ano":"Ne",favorite:f.favorite?"Ano":"Ne"};
+  return {...f,favorite:f.favorite?"Ano":"Ne"};
 }
-document.getElementById("addFriendBtn").onclick=()=>openModal("Přidat přítele",friendFields,o=>{data.friends.push({id:"friend_"+Date.now(),...normalizeFriend(o)});saveData("Přítel byl přidán.")},{ets:"Ano",farm:"Ne",favorite:"Ne"});
-window.editFriend=i=>openModal("Upravit přítele",friendFields,o=>{data.friends[i]={...data.friends[i],...normalizeFriend(o)};saveData("Přítel byl upraven.")},friendEditValues(data.friends[i]));
+document.getElementById("addFriendBtn").onclick=()=>openModal("Přidat člena týmu",friendFields,o=>{data.friends.push({id:"friend_"+Date.now(),activities:[],...normalizeFriend(o)});saveData("Člen týmu byl přidán.")},{role:"Spoluhráč",status:"Aktivní",favorite:"Ne"});
+window.editFriend=i=>openModal("Upravit člena týmu",friendFields,o=>{data.friends[i]={...data.friends[i],...normalizeFriend(o)};saveData("Člen týmu byl upraven.")},friendEditValues(data.friends[i]));
 window.deleteFriend=i=>{if(confirm("Smazat tohoto přítele?")){data.friends.splice(i,1);saveData("Přítel byl smazán.")}};
 window.toggleFriendFavorite=i=>{data.friends[i].favorite=!data.friends[i].favorite;saveData()};
 document.getElementById("friendSearch").oninput=renderFriends;
 document.getElementById("friendFilter").onchange=renderFriends;
+const friendActivityFields=[{name:"date",label:"Datum",type:"date",required:true},{name:"work",label:"Práce",required:true},{name:"field",label:"Pole"},{name:"machine",label:"Stroj"},{name:"hours",label:"Společné hodiny",type:"number",step:"0.1"},{name:"reward",label:"Podíl na odměně (€)",type:"number",step:"0.01"},{name:"rating",label:"Hodnocení spolupráce 1–5",type:"number",step:"1"},{name:"note",label:"Poznámka",type:"textarea",full:true}];
+window.addFriendActivity=i=>openModal(`Společná práce – ${data.friends[i].name}`,friendActivityFields,o=>{const f=data.friends[i];f.activities=f.activities||[];f.activities.push({id:"teamwork_"+Date.now(),...o});if(o.rating)f.rating=o.rating;saveData("Společná práce byla uložena.")},{date:new Date().toISOString().slice(0,10)});
+window.showFriendHistory=i=>{const f=data.friends[i],items=[...(f.activities||[])].reverse();document.getElementById("modalTitle").textContent=`Historie – ${f.name}`;modalForm.innerHTML=`<div class="full machine-service-list">${items.length?items.map((x,ri)=>{const ai=(f.activities||[]).length-1-ri;return `<article><div><strong>${esc(x.work)}</strong><small>${formatDate(x.date)} • ${esc(x.field||'Bez pole')} • ${number(x.hours)} h${x.reward?` • ${euro(x.reward)}`:''}</small><p>${esc(x.machine||'')}${x.note?` • ${esc(x.note)}`:''}</p></div><button type="button" class="danger-btn" onclick="deleteFriendActivity(${i},${ai})">Smazat</button></article>`}).join(''):'<div class="empty">Zatím není uložená žádná společná práce.</div>'}</div><div class="full detail-toolbar"><button type="button" class="secondary-btn" id="cancelModal">Zavřít</button></div>`;modalForm.onsubmit=e=>e.preventDefault();modal.classList.add("open");document.getElementById("cancelModal").onclick=closeModal};
+window.deleteFriendActivity=(i,a)=>{if(!confirm("Smazat společnou práci?"))return;data.friends[i].activities.splice(a,1);saveData("Společná práce byla smazána.");showFriendHistory(i)};
 
 // Centrum 2.0
 const plannerFields=[

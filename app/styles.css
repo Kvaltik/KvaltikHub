@@ -447,6 +447,7 @@ body.light .sidebar{background:var(--surface)}
   .update-notice-banner{grid-template-columns:auto 1fr}
   .update-channel-box{align-items:flex-start;flex-direction:column}
 }
+.friend-photo{object-fit:cover;background:var(--surface-2)}
 
 /* Centrum 2.0 */
 .planner-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}

@@ -1,0 +1,12 @@
+Kvaltík Hub 20.3.0
+
+Nová sekce Tým farmy:
+- Profily přátel a spoluhráčů s fotografií, přezdívkou a kontakty.
+- Role člena týmu, aktivní stav, oblíbení a hodnocení spolupráce.
+- Evidence společných Farming prací, motohodin a rozdělených odměn.
+- Historie práce s polem, strojem a poznámkou.
+- Přiřazení spoluhráče přímo k zakázce.
+- Automatické zapsání společné práce po dokončení přiřazené zakázky.
+- Statistiky celkových společných hodin a odměn.
+- Vyhledávání a filtrování členů týmu.
+- Tým je veden samostatně pro každý profil farmy.
