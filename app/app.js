@@ -27,6 +27,7 @@ const defaultUserData={
   planner:[],notifications:[],youtubeVideos:[],etsService:[],farmManagement:[],pins:[],musicFavorites:[],musicHistory:[],
   trash:[],budgets:{ets:0,farming:0,monthly:0},security:{pinHash:"",autoLockMinutes:0},weatherCities:["Praha"],
   backupSettings:{daily:true,keep:10,lastDate:""},youtubeTemplates:[],
+  farmProfiles:[],activeFarmId:"",onboardingDone:false,
   dashboardWidgets:{weather:true,clock:true,finance:true,nextService:true,lastTrip:true,nowPlaying:true,nextStream:true},
   betaFeatures:{experimentalTab:false,newCharts:true,weatherAlerts:false},
   updateSettings:{autoCheck:true,autoDownload:false,backupBeforeUpdate:true,channel:"stable"},
@@ -65,10 +66,18 @@ function loadUserData(username){
 }
 function saveData(message){
   if(!currentUser)return;
+  saveActiveFarmSnapshot();
   hubStorage.setItem(userDataKey(currentUser.username),JSON.stringify(data));
   renderAll();
   if(message)toast(message);
 }
+const farmDataKeys=["farming","farmMachines","farmFields","farmStorage","farmFinance","farmJobs","farmFuel","fieldHistory","farmManagement","planner","gallery"];
+function farmSnapshot(){return Object.fromEntries(farmDataKeys.map(k=>[k,structuredClone(data[k]||[])]))}
+function saveActiveFarmSnapshot(){const profile=(data.farmProfiles||[]).find(x=>x.id===data.activeFarmId);if(profile)profile.snapshot=farmSnapshot()}
+function renderFarmProfiles(){const select=document.getElementById("activeFarmSelect");if(!select)return;const profiles=data.farmProfiles||[];select.innerHTML=profiles.map(x=>`<option value="${esc(x.id)}" ${x.id===data.activeFarmId?'selected':''}>${esc(x.name)}</option>`).join('')||'<option value="">Moje farma</option>'}
+function createFarmProfile(values,useCurrent=false){const profile={id:"farmprofile_"+Date.now(),name:values.name,map:values.map||"",manager:values.manager||"",created:values.created||new Date().toISOString().slice(0,10),snapshot:useCurrent?farmSnapshot():Object.fromEntries(farmDataKeys.map(k=>[k,[]]))};data.farmProfiles=data.farmProfiles||[];data.farmProfiles.push(profile);data.activeFarmId=profile.id;if(!useCurrent)farmDataKeys.forEach(k=>data[k]=[]);data.onboardingDone=true;return profile}
+function farmProfileFields(){return[{name:"name",label:"Název farmy",required:true,full:true},{name:"map",label:"Mapa / herní kariéra"},{name:"manager",label:"Správce farmy"},{name:"created",label:"Založeno",type:"date"}]}
+function ensureFarmOnboarding(){if(data.onboardingDone&&data.farmProfiles?.length){renderFarmProfiles();return}openModal("Vítej v Kvaltík Hub Farming",farmProfileFields(),o=>{createFarmProfile(o,true);saveData("Farma je připravená. Vítej!")},{name:"Moje farma",manager:currentUser?.username||"",created:new Date().toISOString().slice(0,10)})}
 function setSession(username,remember=true){
   if(remember){
     hubStorage.setItem(SESSION_KEY,username);
@@ -98,6 +107,7 @@ function showApp(){
   document.getElementById("accountInfo").textContent=`Uživatel: ${currentUser.username} • E-mail: ${currentUser.email}`;
   document.getElementById("welcomeTitle").textContent=`Vítej, ${data.about.name||currentUser.username}! 🚜🚛`;
   renderAll();
+  setTimeout(ensureFarmOnboarding,250);
   scheduleAutoLock();
   setTimeout(()=>initUpdaterUi(true),1000);
 }
@@ -162,8 +172,11 @@ document.getElementById("registerForm").onsubmit=e=>{
   document.getElementById("loginUsername").value=u;
 };
 document.getElementById("logoutBtn").onclick=()=>{clearSession();currentUser=null;data=structuredClone(defaultUserData);showAuth()};
+document.getElementById("addFarmProfileBtn").onclick=()=>openModal("Nová farma",farmProfileFields(),o=>{saveActiveFarmSnapshot();createFarmProfile(o,false);saveData("Nová farma byla vytvořena.")},{created:new Date().toISOString().slice(0,10)});
+document.getElementById("activeFarmSelect").onchange=e=>{saveActiveFarmSnapshot();const profile=data.farmProfiles.find(x=>x.id===e.target.value);if(!profile)return;data.activeFarmId=profile.id;farmDataKeys.forEach(k=>data[k]=structuredClone(profile.snapshot?.[k]||[]));saveData(`Aktivní farma: ${profile.name}`)};
 
 function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function safeHttpUrl(value){try{const url=new URL(value);return ["http:","https:"].includes(url.protocol)?url.href:""}catch{return""}}
 function formatDate(v){if(!v)return"—";return new Date(v+"T12:00:00").toLocaleDateString("cs-CZ")}
 function number(v){return new Intl.NumberFormat("cs-CZ",{maximumFractionDigits:1}).format(Number(v||0))}
 function euro(v){return new Intl.NumberFormat("cs-CZ",{maximumFractionDigits:0}).format(Number(v||0))+" €"}
@@ -209,7 +222,8 @@ function renderDashboard(){
   document.getElementById("statEtsKm").textContent=number(data.farmMachines.reduce((s,x)=>s+Number(x.hours||0),0))+" h";
   document.getElementById("statFarmJobs").textContent=data.farming.length;
   document.getElementById("statImages").textContent=data.farmFields.length;
-  document.getElementById("welcomeTitle").textContent=`Vítej na farmě, ${data.about.name||currentUser?.username||"Kvaltík"}! 🚜`;
+  const activeFarm=data.farmProfiles?.find(x=>x.id===data.activeFarmId);
+  document.getElementById("welcomeTitle").textContent=`${activeFarm?.name||"Moje farma"} • ${data.about.name||currentUser?.username||"Kvaltík"} 🚜`;
 
   const services=data.farmMachines.filter(m=>Number(m.nextServiceHours)>0).sort((a,b)=>(Number(a.nextServiceHours)-Number(a.hours||0))-(Number(b.nextServiceHours)-Number(b.hours||0))).slice(0,4);
   document.getElementById("recentEts").innerHTML=services.length?services.map(m=>{const left=Number(m.nextServiceHours)-Number(m.hours||0);return `<div class="mini-item"><strong>${esc(m.brand)} ${esc(m.model)}</strong><small>${left<=0?'⚠️ Servis je potřeba provést':`Do servisu zbývá ${number(left)} h`}</small></div>`}).join(""):`<div class="empty">Zatím není naplánovaný žádný servis.</div>`;
@@ -590,7 +604,7 @@ function renderNotes(){
 function applyTheme(){document.body.classList.toggle("light",data.theme==="light");document.getElementById("themeBtn").textContent=data.theme==="light"?"☀️":"🌙"}
 function renderWeatherSettings(){const el=document.getElementById("weatherCityInput");if(el)el.value=data.weatherCity||"Praha"}
 function renderAll(){
-  const renderers=[renderDashboard,renderEts,renderCompany,renderEtsFleetPage,renderEtsFinancePage,renderFarm,renderFarmMachines,renderFarmFields,renderFarmStorage,renderFarmFinancePage,renderFarmOperations,renderFriends,renderGallery,renderAbout,renderSocials,renderDiscord,renderProjects,renderNotes,renderWeatherSettings,renderHub2,renderTools2,applyTheme];
+  const renderers=[renderFarmProfiles,renderDashboard,renderEts,renderCompany,renderEtsFleetPage,renderEtsFinancePage,renderFarm,renderFarmMachines,renderFarmFields,renderFarmStorage,renderFarmFinancePage,renderFarmOperations,renderFriends,renderGallery,renderAbout,renderSocials,renderDiscord,renderProjects,renderNotes,renderWeatherSettings,renderHub2,renderTools2,applyTheme];
   renderers.forEach(fn=>{try{fn()}catch(err){console.error("Render error:",fn.name,err)}});
 }
 
@@ -873,7 +887,7 @@ document.getElementById("friendFilter").onchange=renderFriends;
 
 // Centrum 2.0
 const plannerFields=[
-  {name:"title",label:"Název",required:true,full:true},{name:"type",label:"Typ",type:"select",options:["Úkol","Připomínka","Stream","Video","Servis","Zakázka"]},
+  {name:"title",label:"Název",required:true,full:true},{name:"type",label:"Typ",type:"select",options:["Setí","Hnojení","Postřik","Sklizeň","Servis","Zakázka","Připomínka"]},
   {name:"date",label:"Datum",type:"date",required:true},{name:"time",label:"Čas",type:"time"},{name:"repeat",label:"Opakování",type:"select",options:["Nikdy","Denně","Týdně","Měsíčně"]},{name:"priority",label:"Priorita",type:"select",options:["Běžná","Důležitá","Kritická"]},
   {name:"note",label:"Poznámka",type:"textarea",full:true}
 ];
@@ -889,9 +903,9 @@ const serviceFields=[
   {name:"nextDate",label:"Další servis",type:"date"},{name:"nextKm",label:"Další servis v km",type:"number"},{name:"note",label:"Poznámka",type:"textarea",full:true}
 ];
 const farmManagementFields=[
-  {name:"date",label:"Datum",type:"date",required:true},{name:"type",label:"Oblast",type:"select",options:["Servis stroje","Pole","Sklizeň","Zásoby","Osivo","Hnojivo","Zvířata","Výroba","Kontrakt"]},
-  {name:"name",label:"Název / položka",required:true},{name:"amount",label:"Množství"},{name:"minimum",label:"Minimální zásoba",type:"number"},{name:"status",label:"Stav",type:"select",options:["Plánováno","Probíhá","Hotovo","Pozastaveno"]},
-  {name:"value",label:"Hodnota (€)",type:"number",step:"0.01"},{name:"note",label:"Poznámka",type:"textarea",full:true}
+  {name:"date",label:"Datum",type:"date",required:true},{name:"type",label:"Oblast",type:"select",options:["Zvířata","Výroba","Náhradní díl","Pracovník","Mapa / bod farmy","Budova / místo","Dokument","Osivo","Hnojivo","Krmivo","Kontrakt"]},
+  {name:"name",label:"Název / položka",required:true},{name:"amount",label:"Množství / údaj"},{name:"minimum",label:"Minimální zásoba",type:"number"},{name:"status",label:"Stav",type:"select",options:["Aktivní","Plánováno","Probíhá","Hotovo","Nízká zásoba","Pozastaveno"]},
+  {name:"value",label:"Hodnota (€)",type:"number",step:"0.01"},{name:"link",label:"Odkaz na dokument / mapu",type:"url",full:true},{name:"note",label:"Poznámka",type:"textarea",full:true}
 ];
 function byDate(a,b){return String(a.date||a.releaseDate||"9999").localeCompare(String(b.date||b.releaseDate||"9999"))}
 function actionButtons(kind,i,label,id){return `<div class="smart-actions"><button onclick="edit${kind}(${i})">Upravit</button><button onclick="togglePin('${kind}','${encodeURIComponent(id)}','${encodeURIComponent(label)}')">📌</button><button class="danger-mini" onclick="delete${kind}(${i})">Smazat</button></div>`}
@@ -906,7 +920,8 @@ function generatedNotifications(){
   const now=new Date(), limit=new Date(Date.now()+7*86400000);
   const planned=data.planner.filter(x=>!x.done&&x.date).filter(x=>{const d=new Date(x.date+"T23:59:59");return d>=now&&d<=limit}).map(x=>({id:"plan_"+x.id,type:x.type,title:x.title,text:`Termín ${formatDate(x.date)}${x.time?` v ${x.time}`:''}`,date:x.date,read:false,generated:true}));
   const services=data.farmMachines.filter(m=>Number(m.nextServiceHours)>0&&Number(m.nextServiceHours)-Number(m.hours||0)<=10).map(m=>{const left=Number(m.nextServiceHours)-Number(m.hours||0);return{id:`farm_service_${m.id}_${m.nextServiceHours}`,type:"Servis stroje",title:`${m.brand} ${m.model}`,text:left<=0?`Servis je potřeba provést (${number(m.hours)} h).`:`Do servisu zbývá ${number(left)} motohodin.`,date:new Date().toISOString().slice(0,10),read:false,generated:true}});
-  return [...planned,...services];
+  const stock=data.farmManagement.filter(x=>Number(x.minimum)>0&&Number(x.amount)<=Number(x.minimum)).map(x=>({id:`stock_${x.id}_${x.amount}`,type:"Nízká zásoba",title:x.name,text:`Zbývá ${x.amount}; nastavené minimum je ${x.minimum}.`,date:new Date().toISOString().slice(0,10),read:false,generated:true}));
+  return [...planned,...services,...stock];
 }
 function renderNotifications2(){
   const el=document.getElementById("notificationList");if(!el)return;
@@ -923,11 +938,11 @@ function monthBuckets(items,valueKey){const out={};items.forEach(x=>{if(!x.date)
 function chartHtml(entries,suffix){const max=Math.max(1,...entries.map(x=>x[1]));return entries.length?entries.map(([k,v])=>`<div class="bar-row"><small>${k}</small><div><i style="width:${Math.max(3,v/max*100)}%"></i></div><strong>${number(v)} ${suffix}</strong></div>`).join(""):'<div class="empty">Zatím nejsou data.</div>'}
 function renderStatistics2(){
   const cards=document.getElementById("statisticsCards");if(!cards)return;
-  const etsKm=data.ets2.reduce((s,x)=>s+Number(x.km||0),0),etsIncome=data.ets2.reduce((s,x)=>s+Number(x.income||0),0),farmHours=data.farming.reduce((s,x)=>s+Number(x.hours||0),0),farmIncome=data.farming.reduce((s,x)=>s+Number(x.income||0),0);
-  cards.innerHTML=`<div class="stat-card"><span>🛣️</span><strong>${number(etsKm)} km</strong><small>ETS 2 celkem</small></div><div class="stat-card"><span>💶</span><strong>${euro(etsIncome)}</strong><small>ETS výdělky</small></div><div class="stat-card"><span>⏱️</span><strong>${number(farmHours)} h</strong><small>Farming motohodiny</small></div><div class="stat-card"><span>🌾</span><strong>${euro(farmIncome)}</strong><small>Farming výdělky</small></div>`;
-  document.getElementById("etsMonthlyChart").innerHTML=chartHtml(monthBuckets(data.ets2,"km"),"km");document.getElementById("farmMonthlyChart").innerHTML=chartHtml(monthBuckets(data.farming,"hours"),"h");
+  const farmHours=data.farming.reduce((s,x)=>s+Number(x.hours||0),0),income=data.farmFinance.filter(x=>x.type==="Příjem").reduce((s,x)=>s+Number(x.amount||0),0),expense=data.farmFinance.filter(x=>x.type==="Výdaj").reduce((s,x)=>s+Number(x.amount||0),0),fuel=data.farmFuel.reduce((s,x)=>s+Number(x.liters||0),0);
+  cards.innerHTML=`<div class="stat-card"><span>⏱️</span><strong>${number(farmHours)} h</strong><small>Odpracováno</small></div><div class="stat-card"><span>💶</span><strong>${euro(income-expense)}</strong><small>Zisk farmy</small></div><div class="stat-card"><span>⛽</span><strong>${number(fuel)} l</strong><small>Spotřeba paliva</small></div><div class="stat-card"><span>🌾</span><strong>${data.farmFields.length}</strong><small>Polí</small></div>`;
+  document.getElementById("etsMonthlyChart").innerHTML=chartHtml(monthBuckets(data.farmFinance,"amount"),"€");document.getElementById("farmMonthlyChart").innerHTML=chartHtml(monthBuckets(data.farming,"hours"),"h");
 }
-function renderRecordList(target,items,kind){const el=document.getElementById(target);if(!el)return;el.innerHTML=items.length?items.map((x,i)=>`<article class="smart-item"><div><span class="smart-badge">${esc(x.type)}</span><h4>${esc(x.vehicle||x.name)}</h4><p>${formatDate(x.date)} • ${x.cost?euro(x.cost):x.amount||x.status||''}</p><small>${esc(x.note||'')}${x.nextDate?` • Další termín ${formatDate(x.nextDate)}`:''}</small></div>${actionButtons(kind,i,x.vehicle||x.name,x.id)}</article>`).join(""):'<div class="empty">Zatím tu nejsou žádné záznamy.</div>'}
+function renderRecordList(target,items,kind){const el=document.getElementById(target);if(!el)return;el.innerHTML=items.length?items.map((x,i)=>{const link=safeHttpUrl(x.link);return `<article class="smart-item"><div><span class="smart-badge">${esc(x.type)}</span><h4>${esc(x.vehicle||x.name)}</h4><p>${formatDate(x.date)} • ${x.cost?euro(x.cost):x.amount||x.status||''}</p><small>${esc(x.note||'')}${x.nextDate?` • Další termín ${formatDate(x.nextDate)}`:''}</small>${link?`<p><a class="record-link" href="${esc(link)}" target="_blank" rel="noopener">Otevřít dokument nebo mapu ↗</a></p>`:''}</div>${actionButtons(kind,i,x.vehicle||x.name,x.id)}</article>`}).join(""):'<div class="empty">Zatím tu nejsou žádné záznamy.</div>'}
 function searchableRecords(){
   const groups=[["Jízda",data.ets2,x=>`${x.truck} ${x.from} ${x.to} ${x.cargo}`],["Stroj",data.farmMachines,x=>`${x.brand} ${x.model} ${x.note}`],["Servis",data.etsService,x=>`${x.vehicle} ${x.type} ${x.note}`],["Farma",data.farmManagement,x=>`${x.name} ${x.type} ${x.note}`],["Poznámka",data.notes,x=>`${x.title} ${x.text}`],["Projekt",data.projects,x=>`${x.name} ${x.description}`],["Kamarád",data.friends,x=>`${x.name} ${x.nickname} ${x.note}`],["Video",data.youtubeVideos,x=>`${x.title} ${x.description} ${x.tags}`]];
   return groups.flatMap(([type,items,text])=>items.map((x,i)=>({type,index:i,title:x.title||x.name||x.vehicle||x.model||x.truck||type,text:text(x),date:x.date||x.releaseDate||""})));
@@ -1004,7 +1019,10 @@ window.readNotification=id=>{let x=data.notifications.find(n=>n.id===id);if(!x){
 window.dismissNotification=id=>{let x=data.notifications.find(n=>n.id===id);if(!x)data.notifications.push({id,dismissed:true});else x.dismissed=true;saveData()};document.getElementById("markNotificationsBtn").onclick=()=>{generatedNotifications().forEach(g=>{if(!data.notifications.some(x=>x.id===g.id))data.notifications.push({...g,read:true})});data.notifications.forEach(x=>x.read=true);saveData("Oznámení jsou přečtená.")};
 function downloadText(name,text,type="text/plain"){const blob=new Blob([text],{type});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function csv(rows){return rows.map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\n")}
-document.getElementById("exportStatsBtn").onclick=()=>downloadText("kvaltik-statistiky.csv",csv([["Kategorie","Hodnota"],["ETS km",data.ets2.reduce((s,x)=>s+Number(x.km||0),0)],["ETS výdělek",data.ets2.reduce((s,x)=>s+Number(x.income||0),0)],["Farming hodiny",data.farming.reduce((s,x)=>s+Number(x.hours||0),0)],["Farming výdělek",data.farming.reduce((s,x)=>s+Number(x.income||0),0)]]),"text/csv;charset=utf-8");
+document.getElementById("exportStatsBtn").onclick=()=>downloadText("kvaltik-farming-statistiky.csv",csv([["Kategorie","Hodnota"],["Stroje",data.farmMachines.length],["Pole",data.farmFields.length],["Pracovní záznamy",data.farming.length],["Motohodiny",data.farming.reduce((s,x)=>s+Number(x.hours||0),0)],["Palivo (l)",data.farmFuel.reduce((s,x)=>s+Number(x.liters||0),0)],["Příjmy",data.farmFinance.filter(x=>x.type==="Příjem").reduce((s,x)=>s+Number(x.amount||0),0)],["Výdaje",data.farmFinance.filter(x=>x.type==="Výdaj").reduce((s,x)=>s+Number(x.amount||0),0)]]),"text/csv;charset=utf-8");
+document.getElementById("exportJobsBtn").onclick=()=>downloadText("kvaltik-zakazky.csv",csv([["Datum","Název","Stav","Pole","Stroj","Práce","Odměna","Poznámka"],...data.farmJobs.map(x=>[x.date,x.title,x.status,x.field,x.machine,x.work,x.reward,x.note])]),"text/csv;charset=utf-8");
+document.getElementById("exportFuelBtn").onclick=()=>downloadText("kvaltik-tankovani.csv",csv([["Datum","Stroj","Motohodiny","Litry","Cena za litr","Celkem","Poznámka"],...data.farmFuel.map(x=>[x.date,x.machine,x.hours,x.liters,x.price,x.total,x.note])]),"text/csv;charset=utf-8");
+document.getElementById("exportFieldsBtn").onclick=()=>downloadText("kvaltik-historie-poli.csv",csv([["Datum","Pole","Práce","Plodina","Stroj","Výnos","Náklady","Poznámka"],...data.fieldHistory.map(x=>[x.date,x.field,x.action,x.crop,x.machine,x.yield,x.cost,x.note])]),"text/csv;charset=utf-8");
 document.getElementById("exportFinanceBtn").onclick=()=>downloadText("kvaltik-finance.csv",csv([["Sekce","Datum","Typ","Kategorie","Částka","Popis"],...data.etsFinance.map(x=>["ETS",x.date,x.type,x.category,x.amount,x.description]),...data.farmFinance.map(x=>["Farming",x.date,x.type,x.category,x.amount,x.description])]),"text/csv;charset=utf-8");
 document.getElementById("exportAllV2Btn").onclick=()=>downloadText(`kvaltik-hub-komplet-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify({version:2,exportedAt:new Date().toISOString(),user:currentUser?.username,data},null,2),"application/json");
 

@@ -1,0 +1,14 @@
+Kvaltík Hub 20.2.0
+
+Velký balíček Správa farmy:
+- Sezónní kalendář pro setí, hnojení, postřiky, sklizeň, servis a zakázky.
+- Evidence zvířat, krmiva, výroby, budov, pracovníků a kontraktů.
+- Sklad náhradních dílů, osiva a hnojiva s minimální zásobou.
+- Automatická upozornění na nízké zásoby, servis a blížící se termíny.
+- Farming statistiky, měsíční grafy práce a hospodaření.
+- Fotogalerie pro dokumentaci polí a sklizně.
+- Evidence dokumentů, map a míst s bezpečnými odkazy.
+- Více samostatných profilů farem s rychlým přepínáním dat.
+- Úvodní průvodce vytvořením první farmy.
+- Denní zálohy, obnovení dat, tisk do PDF a nové CSV exporty.
+- Zakázky, tankování a historie polí z verze 20.1 zůstávají zachované.

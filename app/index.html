@@ -129,10 +129,23 @@
         <button class="nav-item" data-page="farm-jobs">📋 <span>Zakázky</span></button>
         <button class="nav-item" data-page="farm-fuel">⛽ <span>Tankování</span></button>
         <button class="nav-item" data-page="field-history">🌱 <span>Historie polí</span></button>
+        <div class="nav-folder">
+          <button class="nav-folder-toggle" data-folder="farm-center"><span>🌿 Správa farmy</span><span class="folder-arrow">▸</span></button>
+          <div class="nav-folder-items" id="folder-farm-center">
+            <button class="nav-subitem" data-page="planner">📆 Sezónní kalendář</button>
+            <button class="nav-subitem" data-page="farm-management">🐄 Hospodářství</button>
+            <button class="nav-subitem" data-page="statistics">📊 Statistiky</button>
+            <button class="nav-subitem" data-page="notifications">🔔 Upozornění</button>
+            <button class="nav-subitem" data-page="gallery">📷 Fotografie polí</button>
+            <button class="nav-subitem" data-page="tools">🧰 Zálohy a exporty</button>
+          </div>
+        </div>
         <button class="nav-item" data-page="settings">⚙️ <span>Nastavení</span></button>
       </nav>
 
       <div class="sidebar-footer">
+        <label class="farm-profile-label">Aktivní farma<select id="activeFarmSelect"></select></label>
+        <button class="secondary-btn farm-profile-add" id="addFarmProfileBtn">+ Nová farma</button>
         <small id="loggedUserLabel">Nepřihlášen</small>
       </div>
     </aside>
@@ -405,8 +418,8 @@
 
 <section class="page" id="page-gallery">
         <div class="section-head">
-          <div><h3>🖼️ Obrázky</h3><p>Nahraj si screenshoty, náhledovky nebo jiné obrázky.</p></div>
-          <label class="primary-btn file-upload-btn">+ Nahrát obrázky
+          <div><h3>📷 Fotografie polí</h3><p>Dokumentuj vývoj polí, porostu, sklizně a provedených prací.</p></div>
+          <label class="primary-btn file-upload-btn">+ Nahrát fotografie
             <input type="file" id="imageInput" accept="image/*" multiple />
           </label>
         </div>
@@ -501,13 +514,13 @@
       </section>
 
       <section class="page" id="page-planner">
-        <div class="section-head"><div><h3>📆 Chytrý plánovač</h3><p>Úkoly, připomínky, streamy, videa, servisy a zakázky v jednom kalendáři.</p></div><button class="primary-btn" id="addPlannerBtn">+ Nová událost</button></div>
+        <div class="section-head"><div><h3>📆 Sezónní kalendář</h3><p>Setí, hnojení, postřiky, sklizně, servisy a další farmářské termíny.</p></div><button class="primary-btn" id="addPlannerBtn">+ Nová událost</button></div>
         <div class="planner-summary" id="plannerSummary"></div>
         <div class="panel"><div id="plannerList" class="smart-list"></div></div>
       </section>
 
       <section class="page" id="page-notifications">
-        <div class="section-head"><div><h3>🔔 Centrum oznámení</h3><p>Aktualizace, termíny, streamy, úkoly, servis a počasí.</p></div><button class="secondary-btn" id="markNotificationsBtn">Označit vše jako přečtené</button></div>
+        <div class="section-head"><div><h3>🔔 Farmářská upozornění</h3><p>Termíny, servis strojů a docházející zásoby.</p></div><button class="secondary-btn" id="markNotificationsBtn">Označit vše jako přečtené</button></div>
         <div id="notificationList" class="smart-list"></div>
       </section>
 
@@ -517,9 +530,9 @@
       </section>
 
       <section class="page" id="page-statistics">
-        <div class="section-head"><div><h3>📊 Statistiky a rekordy</h3><p>Souhrn ETS 2, farmy a financí.</p></div><button class="secondary-btn" id="exportStatsBtn">📤 Export CSV</button></div>
+        <div class="section-head"><div><h3>📊 Statistiky hospodaření</h3><p>Práce, zisk, palivo a výsledky farmy.</p></div><button class="secondary-btn" id="exportStatsBtn">📤 Export CSV</button></div>
         <div id="statisticsCards" class="stats-grid"></div>
-        <div class="grid-2 smart-top-gap"><div class="panel"><h3>🚛 ETS 2 po měsících</h3><div id="etsMonthlyChart" class="bar-chart"></div></div><div class="panel"><h3>🚜 Farming po měsících</h3><div id="farmMonthlyChart" class="bar-chart"></div></div></div>
+        <div class="grid-2 smart-top-gap"><div class="panel"><h3>💶 Finance po měsících</h3><div id="etsMonthlyChart" class="bar-chart"></div></div><div class="panel"><h3>🚜 Práce po měsících</h3><div id="farmMonthlyChart" class="bar-chart"></div></div></div>
       </section>
 
       <section class="page" id="page-ets-service">
@@ -528,7 +541,7 @@
       </section>
 
       <section class="page" id="page-farm-management">
-        <div class="section-head"><div><h3>🚜 Farming management</h3><p>Servis, sklizeň, zásoby, zvířata, výroby a kontrakty.</p></div><button class="primary-btn" id="addFarmManagementBtn">+ Záznam farmy</button></div>
+        <div class="section-head"><div><h3>🌿 Hospodářství</h3><p>Zvířata, výroby, pracovníci, náhradní díly, farmy, budovy a další evidence.</p></div><button class="primary-btn" id="addFarmManagementBtn">+ Přidat položku</button></div>
         <div id="farmManagementList" class="smart-list"></div>
       </section>
 
@@ -541,13 +554,14 @@
       </section>
 
       <section class="page" id="page-tools">
-        <div class="section-head"><div><h3>🧰 Nástroje 19.1</h3><p>Zálohy, reporty, rozpočty, počasí, zabezpečení a koš.</p></div><button class="secondary-btn" id="printReportBtn">🖨️ Tisk / uložit jako PDF</button></div>
+        <div class="section-head"><div><h3>🧰 Zálohy a exporty</h3><p>Denní zálohy, obnovení, tisk do PDF, CSV exporty a zabezpečení.</p></div><button class="secondary-btn" id="printReportBtn">🖨️ Tisk / uložit jako PDF</button></div>
         <div class="grid-2">
           <div class="panel"><h3>🛡️ Automatické zálohy</h3><label class="setting-toggle"><div><strong>Denní záloha</strong><small>Uchová posledních 10 kopií účtu.</small></div><input type="checkbox" id="dailyBackupToggle" checked></label><button class="primary-btn" id="backupNowBtn">Vytvořit zálohu teď</button><div id="autoBackupList" class="compact-list"></div></div>
-          <div class="panel"><h3>💰 Měsíční rozpočty</h3><div class="form-grid"><label>ETS 2 (€)<input id="etsBudgetInput" type="number"></label><label>Farming (€)<input id="farmBudgetInput" type="number"></label><button class="primary-btn full" id="saveBudgetsBtn">Uložit rozpočty</button></div><div id="budgetStatus"></div></div>
-          <div class="panel"><h3>🌦️ Sedmidenní počasí</h3><div class="button-row"><input id="weatherCityV2Input" placeholder="Přidat město"><button class="secondary-btn" id="addWeatherCityBtn">Přidat</button></div><div id="weatherCityChips" class="chip-row"></div><div id="weatherForecast" class="forecast-grid"></div></div>
+          <div class="panel legacy-tool-panel"><h3>💰 Měsíční rozpočty</h3><div class="form-grid"><label>ETS 2 (€)<input id="etsBudgetInput" type="number"></label><label>Farming (€)<input id="farmBudgetInput" type="number"></label><button class="primary-btn full" id="saveBudgetsBtn">Uložit rozpočty</button></div><div id="budgetStatus"></div></div>
+          <div class="panel legacy-tool-panel"><h3>🌦️ Sedmidenní počasí</h3><div class="button-row"><input id="weatherCityV2Input" placeholder="Přidat město"><button class="secondary-btn" id="addWeatherCityBtn">Přidat</button></div><div id="weatherCityChips" class="chip-row"></div><div id="weatherForecast" class="forecast-grid"></div></div>
           <div class="panel"><h3>🔐 PIN zámek</h3><p>PIN chrání otevření účtu na tomto zařízení.</p><div class="form-grid"><label>Nový PIN<input id="securityPinInput" type="password" inputmode="numeric" maxlength="8"></label><label>Automatický zámek (min)<input id="autoLockInput" type="number" min="0"></label><button class="primary-btn" id="saveSecurityBtn">Uložit</button><button class="secondary-btn" id="lockNowBtn">Uzamknout nyní</button></div></div>
-          <div class="panel"><h3>🎬 YouTube šablony</h3><div class="form-grid"><label>Název šablony<input id="youtubeTemplateName"></label><label class="full">Výchozí popis a checklist<textarea id="youtubeTemplateText" rows="4"></textarea></label><button class="primary-btn full" id="addYoutubeTemplateBtn">Uložit šablonu</button></div><div id="youtubeTemplateList" class="compact-list"></div></div>
+          <div class="panel legacy-tool-panel"><h3>🎬 YouTube šablony</h3><div class="form-grid"><label>Název šablony<input id="youtubeTemplateName"></label><label class="full">Výchozí popis a checklist<textarea id="youtubeTemplateText" rows="4"></textarea></label><button class="primary-btn full" id="addYoutubeTemplateBtn">Uložit šablonu</button></div><div id="youtubeTemplateList" class="compact-list"></div></div>
+          <div class="panel"><h3>📤 Farming exporty</h3><p>Stáhni zakázky, tankování nebo historii polí jako CSV.</p><div class="button-row"><button class="primary-btn" id="exportJobsBtn">Zakázky CSV</button><button class="secondary-btn" id="exportFuelBtn">Tankování CSV</button><button class="secondary-btn" id="exportFieldsBtn">Historie polí CSV</button></div></div>
           <div class="panel"><h3>🗑️ Odpadkový koš</h3><p>Smazané záznamy lze obnovit.</p><div id="trashList" class="compact-list"></div><button class="danger-btn" id="emptyTrashBtn">Vysypat koš</button></div>
         </div>
       </section>
