@@ -129,6 +129,7 @@
         <button class="nav-item" data-page="farm-jobs">📋 <span>Zakázky</span></button>
         <button class="nav-item" data-page="farm-fuel">⛽ <span>Tankování</span></button>
         <button class="nav-item" data-page="field-history">🌱 <span>Historie polí</span></button>
+        <button class="nav-item" data-page="farm-economy">📈 <span>Ekonomika sezóny</span></button>
         <button class="nav-item" data-page="friends">👥 <span>Tým farmy</span></button>
         <div class="nav-folder">
           <button class="nav-folder-toggle" data-folder="farm-center"><span>🌿 Správa farmy</span><span class="folder-arrow">▸</span></button>
@@ -590,6 +591,14 @@
         <div class="section-head"><div><h3>🌱 Historie polí</h3><p>Kompletní přehled prací, plodin, výnosů a nákladů jednotlivých polí.</p></div><button class="primary-btn" id="addFieldHistoryBtn">+ Přidat záznam</button></div>
         <div class="panel field-filter"><label>Vybrat pole<select id="fieldHistoryFilter"><option value="">Všechna pole</option></select></label></div>
         <div class="smart-list smart-top-gap" id="fieldHistoryList"></div>
+      </section>
+
+      <section class="page" id="page-farm-economy">
+        <div class="section-head"><div><h3>📈 Ekonomika sezóny</h3><p>Ziskovost polí, prodej plodin, náklady a aktuální hodnota strojů.</p></div><div class="season-actions"><label>Rok <input id="seasonYear" type="number" min="2000" max="2100"></label><button class="primary-btn" id="addCropSaleBtn">+ Prodat plodinu</button></div></div>
+        <div class="stats-grid" id="seasonSummary"></div>
+        <div class="section-head smart-top-gap"><div><h3>🌱 Ziskovost polí</h3><p>Tržby z prodeje minus náklady z historie pole.</p></div></div><div class="project-grid" id="fieldProfitGrid"></div>
+        <div class="section-head smart-top-gap"><div><h3>🌾 Prodeje plodin</h3><p>Množství, odběratelé, ceny a výsledné tržby.</p></div></div><div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Pole</th><th>Plodina</th><th>Odběratel</th><th>Množství</th><th>Cena/t</th><th>Celkem</th><th></th></tr></thead><tbody id="cropSalesTableBody"></tbody></table></div></div>
+        <div class="section-head smart-top-gap"><div><h3>🚜 Hodnota a odpisy strojů</h3><p>Orientační hodnota podle pořizovací ceny, roku a ročního odpisu.</p></div></div><div class="project-grid" id="machineValueGrid"></div>
       </section>
 
       <section class="page" id="page-settings">

@@ -1,0 +1,11 @@
+Kvaltík Hub 20.4.0
+
+Nová ekonomika farmy:
+- Přehled výsledků celé sezóny podle zvoleného roku.
+- Ziskovost jednotlivých polí z tržeb a evidovaných nákladů.
+- Evidence prodeje plodin, množství, odběratele a ceny za tunu.
+- Automatický výpočet tržby a propojení prodeje s Farming financemi.
+- Pořizovací cena, rok pořízení a roční odpis u každého stroje.
+- Automatický orientační výpočet aktuální hodnoty techniky.
+- Souhrn příjmů, nákladů, zisku a hodnoty strojů.
+- Data ekonomiky jsou oddělená pro každý profil farmy.

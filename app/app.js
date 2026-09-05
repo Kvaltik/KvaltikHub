@@ -22,7 +22,7 @@ const defaultUserData={
   socials:{youtube:"",instagram:"",twitch:"",tiktok:"",web:""},
   discord:{name:"Kvaltík Community",invite:"",description:"Přidej odkaz na svůj Discord server."},
   company:null,drivers:[],fleet:[],finance:[],
-  etsFinance:[],farmMachines:[],farmFields:[],farmStorage:[],farmFinance:[],farmJobs:[],farmFuel:[],fieldHistory:[],
+  etsFinance:[],farmMachines:[],farmFields:[],farmStorage:[],farmFinance:[],farmJobs:[],farmFuel:[],fieldHistory:[],cropSales:[],
   friends:[],weatherCity:"Praha",
   planner:[],notifications:[],youtubeVideos:[],etsService:[],farmManagement:[],pins:[],musicFavorites:[],musicHistory:[],
   trash:[],budgets:{ets:0,farming:0,monthly:0},security:{pinHash:"",autoLockMinutes:0},weatherCities:["Praha"],
@@ -71,7 +71,7 @@ function saveData(message){
   renderAll();
   if(message)toast(message);
 }
-const farmDataKeys=["farming","farmMachines","farmFields","farmStorage","farmFinance","farmJobs","farmFuel","fieldHistory","farmManagement","planner","gallery","friends"];
+const farmDataKeys=["farming","farmMachines","farmFields","farmStorage","farmFinance","farmJobs","farmFuel","fieldHistory","cropSales","farmManagement","planner","gallery","friends"];
 function farmSnapshot(){return Object.fromEntries(farmDataKeys.map(k=>[k,structuredClone(data[k]||[])]))}
 function saveActiveFarmSnapshot(){const profile=(data.farmProfiles||[]).find(x=>x.id===data.activeFarmId);if(profile)profile.snapshot=farmSnapshot()}
 function renderFarmProfiles(){const select=document.getElementById("activeFarmSelect");if(!select)return;const profiles=data.farmProfiles||[];select.innerHTML=profiles.map(x=>`<option value="${esc(x.id)}" ${x.id===data.activeFarmId?'selected':''}>${esc(x.name)}</option>`).join('')||'<option value="">Moje farma</option>'}
@@ -192,6 +192,7 @@ const pages={
   "farm-jobs":["Zakázky a práce","Plánování a průběh farmářských zakázek"],
   "farm-fuel":["Tankování","Spotřeba paliva a provozní náklady"],
   "field-history":["Historie polí","Práce, plodiny, výnosy a náklady podle polí"],
+  "farm-economy":["Ekonomika sezóny","Ziskovost polí, prodeje plodin a hodnota techniky"],
   friends:["Tým farmy","Přátelé, spoluhráči a společné práce"],
   planner:["Chytrý plánovač","Kalendář, úkoly a připomínky"],notifications:["Centrum oznámení","Historie důležitých událostí"],
   youtube:["YouTube centrum","Tvorba videí od nápadu po vydání"],statistics:["Statistiky","Výsledky, grafy a rekordy"],
@@ -310,11 +311,12 @@ function renderMoneySection(items,prefix,tableId){
 }
 function renderEtsFinancePage(){renderMoneySection(data.etsFinance,"etsFinance","etsFinanceTable")}
 function renderFarmFinancePage(){renderMoneySection(data.farmFinance,"farmFinance","farmFinanceTable")}
+function machineValue(machine){const price=Number(machine.purchasePrice||0),year=Number(machine.purchaseYear||new Date().getFullYear()),rate=Math.max(0,Math.min(100,Number(machine.depreciationRate||0))),age=Math.max(0,new Date().getFullYear()-year);return price*Math.pow(1-rate/100,age)}
 function renderFarmMachines(){
   const el=document.getElementById("farmMachinesGrid"); if(!el)return;
   el.innerHTML=data.farmMachines.length?data.farmMachines.map((m,i)=>{
     const photos=machinePhotos(m),services=m.services||[],next=Number(m.nextServiceHours||0),remaining=next-Number(m.hours||0),due=next>0&&remaining<=0;
-    return `<div class="vehicle-card machine-card ${due?'machine-service-due':''}">${photos[0]?`<img class="machine-photo" src="${photos[0]}" alt="${esc(m.brand)} ${esc(m.model)}">`:`<div class="machine-photo-placeholder">🚜</div>`}<h4>🚜 ${esc(m.brand)} ${esc(m.model)}</h4><p>${esc(m.type||"Stroj")}</p><div class="card-kpis"><div class="card-kpi"><small>Motohodiny</small><strong>${number(m.hours)} h</strong></div><div class="card-kpi"><small>Další servis</small><strong>${next?`${number(next)} h`:'Nenastaven'}</strong></div></div>${next?`<div class="service-reminder ${due?'due':''}">${due?'⚠️ Servis je potřeba provést':`🔧 Do servisu zbývá ${number(remaining)} h`}</div>`:''}<div class="machine-meta">📷 ${photos.length} • 🛠️ ${services.length} servisů</div><div class="card-actions"><button class="secondary-btn" onclick="openMachineDetails(${i})">Detail</button><button class="secondary-btn" onclick="addMachinePhotos(${i})">+ Fotky</button><button class="secondary-btn" onclick="addMachineService(${i})">+ Servis</button><button class="secondary-btn" onclick="editFarmMachine(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmMachine(${i})">Smazat</button></div></div>`;
+    return `<div class="vehicle-card machine-card ${due?'machine-service-due':''}">${photos[0]?`<img class="machine-photo" src="${photos[0]}" alt="${esc(m.brand)} ${esc(m.model)}">`:`<div class="machine-photo-placeholder">🚜</div>`}<h4>🚜 ${esc(m.brand)} ${esc(m.model)}</h4><p>${esc(m.type||"Stroj")}</p><div class="card-kpis"><div class="card-kpi"><small>Motohodiny</small><strong>${number(m.hours)} h</strong></div><div class="card-kpi"><small>Další servis</small><strong>${next?`${number(next)} h`:'Nenastaven'}</strong></div></div>${next?`<div class="service-reminder ${due?'due':''}">${due?'⚠️ Servis je potřeba provést':`🔧 Do servisu zbývá ${number(remaining)} h`}</div>`:''}<div class="machine-meta">📷 ${photos.length} • 🛠️ ${services.length} servisů${m.purchasePrice?` • Odhad ${euro(machineValue(m))}`:''}</div><div class="card-actions"><button class="secondary-btn" onclick="openMachineDetails(${i})">Detail</button><button class="secondary-btn" onclick="addMachinePhotos(${i})">+ Fotky</button><button class="secondary-btn" onclick="addMachineService(${i})">+ Servis</button><button class="secondary-btn" onclick="editFarmMachine(${i})">Upravit</button><button class="danger-btn" onclick="deleteFarmMachine(${i})">Smazat</button></div></div>`;
   }).join(""):`<div class="empty" style="grid-column:1/-1">Nemáš přidaný žádný stroj.</div>`;
 }
 function renderFarmFields(){
@@ -605,7 +607,7 @@ function renderNotes(){
 function applyTheme(){document.body.classList.toggle("light",data.theme==="light");document.getElementById("themeBtn").textContent=data.theme==="light"?"☀️":"🌙"}
 function renderWeatherSettings(){const el=document.getElementById("weatherCityInput");if(el)el.value=data.weatherCity||"Praha"}
 function renderAll(){
-  const renderers=[renderFarmProfiles,renderDashboard,renderEts,renderCompany,renderEtsFleetPage,renderEtsFinancePage,renderFarm,renderFarmMachines,renderFarmFields,renderFarmStorage,renderFarmFinancePage,renderFarmOperations,renderFriends,renderGallery,renderAbout,renderSocials,renderDiscord,renderProjects,renderNotes,renderWeatherSettings,renderHub2,renderTools2,applyTheme];
+  const renderers=[renderFarmProfiles,renderDashboard,renderEts,renderCompany,renderEtsFleetPage,renderEtsFinancePage,renderFarm,renderFarmMachines,renderFarmFields,renderFarmStorage,renderFarmFinancePage,renderFarmOperations,renderFarmEconomy,renderFriends,renderGallery,renderAbout,renderSocials,renderDiscord,renderProjects,renderNotes,renderWeatherSettings,renderHub2,renderTools2,applyTheme];
   renderers.forEach(fn=>{try{fn()}catch(err){console.error("Render error:",fn.name,err)}});
 }
 
@@ -649,6 +651,18 @@ function renderFarmOperations(){
     const filter=select?.value||"";const items=data.fieldHistory.map((x,i)=>({...x,_i:i})).filter(x=>!filter||x.field===filter);
     history.innerHTML=items.length?[...items].reverse().map(x=>`<article class="smart-item"><div><span class="smart-badge">${esc(x.action)}</span><h4>${esc(x.field)}${x.crop?` • ${esc(x.crop)}`:''}</h4><p>${formatDate(x.date)} • ${esc(x.machine||'Bez stroje')}${x.yield?` • výnos ${number(x.yield)} t`:''}${x.cost?` • ${euro(x.cost)}`:''}</p><small>${esc(x.note||'')}</small></div><div class="smart-actions"><button onclick="editFieldHistory(${x._i})">Upravit</button><button class="danger-mini" onclick="deleteFieldHistory(${x._i})">Smazat</button></div></article>`).join(''):'<div class="empty">Pro vybrané pole zatím není žádná historie.</div>';
   }
+}
+
+function renderFarmEconomy(){
+  const root=document.getElementById("seasonSummary");if(!root)return;
+  const yearInput=document.getElementById("seasonYear");if(yearInput&&!yearInput.value)yearInput.value=String(new Date().getFullYear());const year=yearInput?.value||String(new Date().getFullYear()),inYear=x=>!x.date||String(x.date).startsWith(year);
+  const sales=data.cropSales.filter(inYear),history=data.fieldHistory.filter(inYear),finance=data.farmFinance.filter(inYear);
+  const revenue=sales.reduce((s,x)=>s+Number(x.total||0),0),costs=history.reduce((s,x)=>s+Number(x.cost||0),0),otherIncome=finance.filter(x=>x.type==="Příjem"&&!x.sourceId?.startsWith("sale_")).reduce((s,x)=>s+Number(x.amount||0),0),otherCosts=finance.filter(x=>x.type==="Výdaj"&&!x.sourceId?.startsWith("fieldwork_")).reduce((s,x)=>s+Number(x.amount||0),0),fleetValue=data.farmMachines.reduce((s,x)=>s+machineValue(x),0);
+  root.innerHTML=`<div class="stat-card"><span>🌾</span><div><strong>${euro(revenue)}</strong><small>Prodej plodin</small></div></div><div class="stat-card"><span>📉</span><div><strong>${euro(costs+otherCosts)}</strong><small>Náklady sezóny</small></div></div><div class="stat-card"><span>💶</span><div><strong>${euro(revenue+otherIncome-costs-otherCosts)}</strong><small>Výsledek sezóny</small></div></div><div class="stat-card"><span>🚜</span><div><strong>${euro(fleetValue)}</strong><small>Odhad hodnoty strojů</small></div></div>`;
+  const fields=[...new Set([...data.farmFields.map(x=>x.number),...history.map(x=>x.field),...sales.map(x=>x.field)].filter(Boolean))];
+  document.getElementById("fieldProfitGrid").innerHTML=fields.length?fields.map(field=>{const income=sales.filter(x=>x.field===field).reduce((s,x)=>s+Number(x.total||0),0),expense=history.filter(x=>x.field===field).reduce((s,x)=>s+Number(x.cost||0),0),profit=income-expense;return `<article class="project-card"><h4>🌱 ${esc(field)}</h4><div class="profit-lines"><span>Tržby <strong>${euro(income)}</strong></span><span>Náklady <strong>${euro(expense)}</strong></span><span class="profit-total ${profit<0?'negative':''}">Zisk <strong>${euro(profit)}</strong></span></div></article>`}).join(''):'<div class="empty">Zatím nejsou data pro výpočet ziskovosti polí.</div>';
+  document.getElementById("cropSalesTableBody").innerHTML=sales.length?[...sales].reverse().map(x=>{const i=data.cropSales.indexOf(x);return `<tr><td>${formatDate(x.date)}</td><td>${esc(x.field)}</td><td>${esc(x.crop)}</td><td>${esc(x.buyer||'—')}</td><td>${number(x.amount)} t</td><td>${euro(x.price)}</td><td>${euro(x.total)}</td><td><button class="action-btn" onclick="editCropSale(${i})">✏️</button><button class="action-btn" onclick="deleteCropSale(${i})">🗑️</button></td></tr>`}).join(''):'<tr><td colspan="8"><div class="empty">V této sezóně zatím není žádný prodej.</div></td></tr>';
+  document.getElementById("machineValueGrid").innerHTML=data.farmMachines.length?data.farmMachines.map(m=>`<article class="project-card"><h4>🚜 ${esc(m.brand)} ${esc(m.model)}</h4><div class="profit-lines"><span>Pořizovací cena <strong>${euro(m.purchasePrice)}</strong></span><span>Roční odpis <strong>${number(m.depreciationRate)} %</strong></span><span class="profit-total">Aktuální odhad <strong>${euro(machineValue(m))}</strong></span></div></article>`).join(''):'<div class="empty">Přidej stroje a jejich pořizovací ceny.</div>';
 }
 function machinePhotos(machine){return Array.isArray(machine.photos)&&machine.photos.length?machine.photos:(machine.image?[machine.image]:[])}
 function openModal(title,fields,onSubmit,values={}){
@@ -792,6 +806,9 @@ const machineFields=[
   {name:"type",label:"Typ",type:"select",options:["Traktor","Kombajn","Řezačka","Nakladač","Přívěs","Jiné"]},
   {name:"hours",label:"Motohodiny",type:"number",step:"0.1"},
   {name:"nextServiceHours",label:"Připomenout servis při motohodinách",type:"number",step:"0.1"},
+  {name:"purchasePrice",label:"Pořizovací cena (€)",type:"number",step:"0.01"},
+  {name:"purchaseYear",label:"Rok pořízení",type:"number",step:"1"},
+  {name:"depreciationRate",label:"Roční odpis (%)",type:"number",step:"0.1"},
   {name:"status",label:"Stav",type:"select",options:["Aktivní","V servisu","Odstavený","Prodán"]},
   {name:"note",label:"Poznámka",type:"textarea",full:true}
 ];
@@ -829,6 +846,12 @@ document.getElementById("addFieldHistoryBtn").onclick=()=>openModal("Nový zázn
 window.editFieldHistory=i=>openModal("Upravit historii pole",historyFields(),o=>{data.fieldHistory[i]={...data.fieldHistory[i],...o};syncHistoryFinance(data.fieldHistory[i]);saveData("Historie pole byla upravena.")},data.fieldHistory[i]);
 window.deleteFieldHistory=i=>{if(!confirm("Smazat záznam pole i propojený výdaj?"))return;const id=data.fieldHistory[i].id;data.fieldHistory.splice(i,1);data.farmFinance=data.farmFinance.filter(x=>x.sourceId!==id);saveData("Záznam pole byl smazán.")};
 document.getElementById("fieldHistoryFilter").onchange=renderFarmOperations;
+function cropSaleFields(){return[{name:"date",label:"Datum prodeje",type:"date",required:true},{name:"field",label:"Pole",type:"select",options:farmOptions(data.farmFields.map(x=>x.number),"Jiné pole")},{name:"crop",label:"Plodina",required:true},{name:"buyer",label:"Odběratel"},{name:"amount",label:"Množství (t)",type:"number",step:"0.01",required:true},{name:"price",label:"Cena za tunu (€)",type:"number",step:"0.01",required:true},{name:"note",label:"Poznámka",type:"textarea",full:true}]}
+function syncSaleFinance(x){x.total=Number(x.amount||0)*Number(x.price||0);let f=data.farmFinance.find(y=>y.sourceId===x.id);if(!f){f={id:"ff_"+Date.now(),sourceId:x.id,type:"Příjem",category:"Prodej"};data.farmFinance.push(f)}Object.assign(f,{date:x.date,amount:x.total,description:`Prodej ${x.crop} – ${x.field}`})}
+document.getElementById("addCropSaleBtn").onclick=()=>openModal("Prodej plodiny",cropSaleFields(),o=>{const x={id:"sale_"+Date.now(),...o};data.cropSales.push(x);syncSaleFinance(x);saveData("Prodej a příjem byly uloženy.")},{date:new Date().toISOString().slice(0,10)});
+window.editCropSale=i=>openModal("Upravit prodej",cropSaleFields(),o=>{data.cropSales[i]={...data.cropSales[i],...o};syncSaleFinance(data.cropSales[i]);saveData("Prodej byl upraven.")},data.cropSales[i]);
+window.deleteCropSale=i=>{if(!confirm("Smazat prodej i propojený příjem?"))return;const id=data.cropSales[i].id;data.cropSales.splice(i,1);data.farmFinance=data.farmFinance.filter(x=>x.sourceId!==id);saveData("Prodej byl smazán.")};
+document.getElementById("seasonYear").onchange=renderFarmEconomy;
 
 const fieldFields=[
   {name:"number",label:"Číslo / název pole",required:true},
